@@ -202,6 +202,10 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('game_state');
 
+    // Spieler Identifizierung via URL (?p=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
+
     const boards = {
         1: { 
             "KATEGORIE 1": [{pts:100,q:"Was ist die Hauptstadt von Frankreich?",a:"Paris"},{pts:200,q:"Wie viele Kontinente gibt es?",a:"7"},{pts:300,q:"Wer malte die Mona Lisa?",a:"Leonardo da Vinci"},{pts:500,q:"Was ist das chemische Symbol für Gold?",a:"Au"}],
@@ -249,6 +253,12 @@
     function updateUI() {
         if (!localState.players) return;
 
+        // Zeige Spieler-Rolle im Logo an
+        if (myPlayerIndex !== null && localState.players[myPlayerIndex]) {
+            document.querySelector('.logo-text').innerText = "DU BIST: " + localState.players[myPlayerIndex].name;
+            document.querySelector('.logo-text').style.fontSize = "1.5rem";
+        }
+
         document.getElementById('btn-b1').className = localState.currentBoard == 1 ? 'btn-nav active' : 'btn-nav';
         document.getElementById('btn-b2').className = localState.currentBoard == 2 ? 'btn-nav active' : 'btn-nav';
 
@@ -284,6 +294,7 @@
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
             s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i && localState.activePlayerIndex === null ? 'selecting' : ''}`;
+            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)"; // Markierung für mich selbst
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
             s.onclick = () => { if(!localState.overlayOpen) updateSync({selectingPlayerIndex: i}); };
             area.appendChild(s);
@@ -340,14 +351,30 @@
     function closeQuestion() { updateSync({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
     function switchBoard(n) { updateSync({currentBoard: n}); }
 
+    // Angepasste Buzzer-Logik
     window.addEventListener('keydown', (e) => {
-        const keyMap = { "Digit1": 0, "Digit2": 1, "Digit3": 2, "Digit4": 3, "Digit5": 4 };
-        if(localState.canBuzz && keyMap.hasOwnProperty(e.code)) {
-            const pIdx = keyMap[e.code];
-            if(!localState.players[pIdx].locked) {
-                playSound('buzzer');
-                updateSync({ activePlayerIndex: pIdx, canBuzz: false, lastEffect: 'buzzer' });
-                setTimeout(() => updateSync({lastEffect: ''}), 500);
+        // Falls ein fester Spieler-Index zugewiesen wurde (?p=1 etc.)
+        if (myPlayerIndex !== null) {
+            // Reagiert auf Leertaste ODER die eigene Nummerntaste
+            const isMyKey = (e.code === "Space" || e.code === "Digit" + (myPlayerIndex + 1));
+            
+            if(localState.canBuzz && isMyKey) {
+                if(!localState.players[myPlayerIndex].locked) {
+                    playSound('buzzer');
+                    updateSync({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
+                    setTimeout(() => updateSync({lastEffect: ''}), 500);
+                }
+            }
+        } else {
+            // Host/Admin Modus (Zahlen 1-5 wie vorher)
+            const keyMap = { "Digit1": 0, "Digit2": 1, "Digit3": 2, "Digit4": 3, "Digit5": 4 };
+            if(localState.canBuzz && keyMap.hasOwnProperty(e.code)) {
+                const pIdx = keyMap[e.code];
+                if(!localState.players[pIdx].locked) {
+                    playSound('buzzer');
+                    updateSync({ activePlayerIndex: pIdx, canBuzz: false, lastEffect: 'buzzer' });
+                    setTimeout(() => updateSync({lastEffect: ''}), 500);
+                }
             }
         }
     });
