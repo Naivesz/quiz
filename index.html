@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeopardy Quiz Show Deluxe - Multi-Cam</title>
+    <title>Jeopardy Quiz Show Deluxe - Camera Enabled</title>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Kanit:wght@600;800;900&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -52,15 +54,13 @@
             width: 100%; aspect-ratio: 16/9;
             background: transparent !important;
             border: 3px solid var(--red-accent); border-radius: 10px; position: relative;
-            overflow: hidden;
+            overflow: hidden; /* Wichtig für Video-Einpassung */
         }
 
-        /* Ergänzung für den Host-Namen: Höchster Layer */
         .gm-label {
             position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
             background: var(--red-accent); padding: 2px 15px; font-size: 0.8rem;
-            font-family: var(--font-show); border-radius: 4px; 
-            z-index: 9999; /* Stellt sicher, dass der Name immer oben liegt */
+            font-family: var(--font-show); border-radius: 4px; z-index: 2; /* Über dem Video */
         }
 
         .nav-controls { text-align: center; }
@@ -122,18 +122,17 @@
         .player-slot {
             aspect-ratio: 16/9; background: transparent !important;
             border: 2px solid #333; position: relative; border-radius: 8px;
-            overflow: hidden;
+            overflow: hidden; /* Wichtig für Video */
         }
 
         .player-slot.active-buzzer { border-color: var(--red-accent); box-shadow: 0 0 20px var(--red-accent); }
         .player-slot.selecting { border-color: var(--text-gold); border-style: dashed; }
 
-        /* Ergänzung für Spielernamen: Sicherstellen, dass Name über Video liegt */
         .player-info {
             position: absolute; bottom: 0; width: 100%;
             background: rgba(225, 29, 72, 0.95); text-align: center;
             font-weight: 900; font-size: 1rem; padding: 5px 0; text-transform: uppercase;
-            z-index: 10; 
+            z-index: 2; /* Über dem Video */
         }
 
         #question-overlay {
@@ -220,32 +219,81 @@
     const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
     const isHost = (myPlayerIndex === null);
 
+    // NEU: Globale Variablen für Video-Management und PeerJS
     let myVideoElement = null;
+    let localStream = null;
+    let myPeer = null;
+    let peers = {}; // Speichert aktive Verbindungen
+    let videoElements = {}; // Speichert Video-DOM-Elemente pro Index (0-4)
 
+    // ERWEITERT: Kamera & PeerJS Initialisierung
     async function initCamera() {
         try {
+            // 1. Lokaler Stream
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            myVideoElement = document.createElement('video');
-            myVideoElement.srcObject = stream;
-            myVideoElement.autoplay = true;
-            myVideoElement.muted = true;
-            myVideoElement.playsInline = true;
+            localStream = stream;
             
-            myVideoElement.style.width = '100%';
-            myVideoElement.style.height = '100%';
-            myVideoElement.style.objectFit = 'cover';
-            myVideoElement.style.position = 'absolute';
-            myVideoElement.style.top = '0';
-            myVideoElement.style.left = '0';
-            myVideoElement.style.zIndex = '1';
-
-            if (isHost) {
-                const hostSlot = document.querySelector('.gm-cam-slot');
-                if (hostSlot) hostSlot.appendChild(myVideoElement);
+            // Lokales Video Element vorbereiten
+            myVideoElement = createVideoElement(stream);
+            myVideoElement.muted = true; // Eigenes Video stummschalten
+            
+            // Falls Spieler, lokales Video speichern für updateUI
+            if (!isHost && myPlayerIndex !== null) {
+                videoElements[myPlayerIndex] = myVideoElement;
+            } else if (isHost) {
+                 const hostSlot = document.querySelector('.gm-cam-slot');
+                 if (hostSlot) hostSlot.insertBefore(myVideoElement, hostSlot.firstChild);
             }
-            updateUI(); 
+
+            // 2. PeerJS Setup (Für Verbindung zu anderen)
+            myPeer = new Peer(null, { debug: 1 });
+            
+            myPeer.on('open', (id) => {
+                if(!isHost && myPlayerIndex !== null) {
+                    // ID in Firebase speichern, damit andere uns anrufen können
+                    db.child('players').child(myPlayerIndex).update({ peerId: id });
+                }
+            });
+
+            // Wenn wir angerufen werden (von Host oder anderen Spielern)
+            myPeer.on('call', (call) => {
+                call.answer(localStream); // Mit eigenem Bild antworten
+                call.on('stream', (remoteStream) => {
+                    // Wir müssen wissen, von wem der Stream kommt. 
+                    // Mapping geschieht über PeerID lookup in localState (siehe updateUI)
+                    handleIncomingStream(call.peer, remoteStream);
+                });
+            });
+
+            updateUI(); // Initiale UI
         } catch (err) {
-            console.error("Kamera Zugriff verweigert:", err);
+            console.error("Kamera Zugriff verweigert oder Fehler:", err);
+        }
+    }
+    
+    // Hilfsfunktion: Erstellt standardisiertes Video-Objekt
+    function createVideoElement(srcObject) {
+        const vid = document.createElement('video');
+        vid.srcObject = srcObject;
+        vid.autoplay = true;
+        vid.playsInline = true;
+        vid.style.width = '100%';
+        vid.style.height = '100%';
+        vid.style.objectFit = 'cover';
+        vid.style.position = 'absolute';
+        vid.style.top = '0';
+        vid.style.left = '0';
+        vid.style.zIndex = '0'; 
+        return vid;
+    }
+
+    // Hilfsfunktion: Stream einem Spieler zuordnen
+    function handleIncomingStream(peerId, stream) {
+        if (!localState.players) return;
+        const index = localState.players.findIndex(p => p.peerId === peerId);
+        if (index !== -1 && !videoElements[index]) {
+            videoElements[index] = createVideoElement(stream);
+            updateUI(); // Video in Slot einfügen
         }
     }
 
@@ -254,10 +302,10 @@
         const userName = prompt("Dein Name:");
         if (userName) {
             db.child('players').child(myPlayerIndex).update({ name: userName });
-            initCamera();
+            initCamera(); 
         }
     } else {
-        initCamera();
+        initCamera(); 
     }
 
     let audioUnlocked = false;
@@ -299,12 +347,28 @@
     db.on('value', (snapshot) => {
         const newState = snapshot.val();
         if(!newState || !newState.players) return;
+        
+        if(newState.lastEffect && newState.lastEffect !== localState.lastEffect) {
+            if(newState.lastEffect === 'correct') triggerFlash('green');
+            if(newState.lastEffect === 'wrong') triggerFlash('red');
+            const s = document.getElementById('sound-' + newState.lastEffect);
+            if(s) { 
+                s.currentTime = 0; 
+                s.volume = 1;
+                s.play().catch(e => console.log("Audio play error", e)); 
+            }
+        }
+
         localState = newState;
         updateUI();
     });
 
     function updateUI() {
         if (!localState.players) return;
+
+        if (!isHost && localState.players[myPlayerIndex]) {
+            document.querySelector('.logo-text').innerText = "DU BIST: " + (localState.players[myPlayerIndex].name || "Spieler");
+        }
 
         const board = document.getElementById('game-board');
         board.innerHTML = '';
@@ -328,53 +392,124 @@
             });
         }
 
-        const area = document.getElementById('player-area'); 
+        const area = document.getElementById('player-area');
+        // WICHTIG: Vor dem Leeren des InnerHTML müssen wir Video-Elemente retten (detach), sonst bricht der Stream ab
+        Object.values(videoElements).forEach(vid => vid.remove());
         area.innerHTML = '';
+        
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
             s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i ? 'selecting' : ''}`;
             if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
-            s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
             
-            // Ergänzung: Wenn es mein lokaler Slot ist, hänge mein Videobild ein
-            if (i === myPlayerIndex && myVideoElement) {
-                s.appendChild(myVideoElement);
+            // LOGIK FÜR NAIVES: "unterhalb der Kamera... immer im Vordergrund"
+            const isNaives = p.name === "Naives";
+            // Z-Index extrem hoch setzen. Bottom:0 beibehalten (CSS Standard).
+            const labelStyle = isNaives ? 'style="z-index: 9999;"' : '';
+
+            s.innerHTML = `<div class="player-info" ${labelStyle}>${p.name}: ${p.score}</div>`;
+            s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
+            
+            // Video einfügen, wenn vorhanden
+            if (videoElements[i]) {
+                const vid = videoElements[i];
+                // Spezialbehandlung Naives: Video etwas verkürzen, damit Text visuell "darunter" liegt
+                if (isNaives) {
+                    vid.style.height = '85%'; // Macht Platz unten
+                } else {
+                    vid.style.height = '100%'; // Standard
+                }
+                s.insertBefore(vid, s.firstChild);
             }
             
-            s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
             area.appendChild(s);
+
+            // PeerJS Verbindungslogik: Andere Spieler anrufen, wenn wir deren ID haben
+            if (myPeer && p.peerId && p.peerId !== myPeer.id && !peers[p.peerId]) {
+                const call = myPeer.call(p.peerId, localStream);
+                peers[p.peerId] = call;
+                call.on('stream', (remoteStream) => {
+                   videoElements[i] = createVideoElement(remoteStream);
+                   updateUI();
+                });
+            }
         });
 
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
+        
         if (localState.overlayOpen) {
             document.getElementById('question-content').innerText = localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion;
         }
         
+        let statusText = "";
+        if(localState.activePlayerIndex !== null) {
+            statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
+        } else if(localState.canBuzz) {
+            statusText = "BUZZER FREI!";
+        } else if (localState.selectingPlayerIndex !== null && !localState.showAnswerMode) {
+             statusText = localState.players[localState.selectingPlayerIndex].name + " ist dran...";
+        }
+
+        document.getElementById('buzzer-status').innerText = statusText;
         document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.selectingPlayerIndex !== null ? localState.players[localState.selectingPlayerIndex].name : "---");
+        
+        document.getElementById('btn-b1').className = currentB === 1 ? 'btn-nav active' : 'btn-nav';
+        document.getElementById('btn-b2').className = currentB === 2 ? 'btn-nav active' : 'btn-nav';
     }
 
     function openQuestion(q, id) {
         let used = localState.usedCards || {1:[], 2:[]};
         if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
         used[localState.currentBoard].push(id);
-        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, activePlayerIndex: localState.selectingPlayerIndex, canBuzz: (localState.selectingPlayerIndex === null), showAnswerMode: false });
+        
+        let activeP = localState.selectingPlayerIndex !== undefined ? localState.selectingPlayerIndex : null;
+        let buzzAllowed = (activeP === null);
+        
+        db.update({ 
+            overlayOpen: true, 
+            currentQuestion: q.q, 
+            currentAnswer: q.a, 
+            currentPoints: q.pts, 
+            usedCards: used, 
+            activePlayerIndex: activeP,
+            canBuzz: buzzAllowed, 
+            showAnswerMode: false, 
+            lastEffect: '',
+            players: localState.players.map(p => ({...p, locked: false})) 
+        });
     }
 
     function handleAnswer(correct) {
+        if(localState.activePlayerIndex === null) return;
         let players = [...localState.players];
         if(correct) {
             players[localState.activePlayerIndex].score += localState.currentPoints;
-            db.update({ players: players, showAnswerMode: true });
+            db.update({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
         } else {
             players[localState.activePlayerIndex].score -= (localState.currentPoints / 2);
-            db.update({ players: players, activePlayerIndex: null, canBuzz: true });
+            players[localState.activePlayerIndex].locked = true;
+            db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
         }
     }
 
-    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null}); }
+    function triggerFlash(color) {
+        const flash = document.getElementById('flash-overlay');
+        flash.style.backgroundColor = color === 'green' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(225, 29, 72, 0.4)';
+        flash.style.opacity = '1'; setTimeout(() => flash.style.opacity = '0', 300);
+    }
+
+    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false, lastEffect: ''}); }
     function switchBoard(n) { db.update({currentBoard: n}); }
-    function resetGame() { if(confirm("Reset?")) db.set({ players: [{ name: "S1", score: 0 }, { name: "S2", score: 0 }, { name: "S3", score: 0 }, { name: "S4", score: 0 }, { name: "S5", score: 0 }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false }); }
+    function resetGame() { if(confirm("Reset?")) db.set({ players: [{ name: "S1", score: 0, locked: false }, { name: "S2", score: 0, locked: false }, { name: "S3", score: 0, locked: false }, { name: "S4", score: 0, locked: false }, { name: "S5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: null, showAnswerMode: false, lastEffect: "" }); }
+
+    window.addEventListener('keydown', (e) => {
+        if (!isHost && myPlayerIndex !== null && localState.canBuzz && e.code === "Space") {
+            if(!localState.players[myPlayerIndex].locked) {
+                db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
+            }
+        }
+    });
 </script>
 </body>
 </html>
