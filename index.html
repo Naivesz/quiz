@@ -32,14 +32,8 @@
             display: flex; flex-direction: column;
         }
 
-        /* Versteckt Steuerungselemente für Spieler */
-        body.is-player .host-only {
-            display: none !important;
-        }
-        
-        body.is-player .quiz-card {
-            cursor: default !important;
-        }
+        body.is-player .host-only { display: none !important; }
+        body.is-player .quiz-card { cursor: default !important; }
 
         #flash-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -79,19 +73,12 @@
         .btn-reset { background: var(--red-accent); border: none; color: white; padding: 8px 15px; font-family: var(--font-show); cursor: pointer; border-radius: 4px; }
 
         .turn-container {
-            text-align: right;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 5px;
+            text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
         }
 
         #current-turn-display {
-            font-family: var(--font-show);
-            color: var(--text-gold);
-            font-size: 1.6rem;
-            text-transform: uppercase;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-family: var(--font-show); color: var(--text-gold); font-size: 1.6rem;
+            text-transform: uppercase; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
 
         #board-container { position: relative; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -148,7 +135,6 @@
         #question-content {
             font-size: 3.2rem; font-weight: 800; max-width: 85%; margin: 20px 0;
             text-align: center; text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
-            transition: color 0.3s ease;
         }
 
         .controls { display: flex; gap: 15px; }
@@ -156,7 +142,6 @@
         .btn-correct { background: var(--green-success); }
         .btn-wrong { background: var(--red-accent); }
         .btn-close { background: #475569; }
-        #btn-next-round { background: var(--blue-highlight); display: none; margin-top: 20px; font-size: 1.5rem; }
     </style>
 </head>
 <body>
@@ -192,7 +177,6 @@
             <button class="btn-wrong" onclick="handleAnswer(false)">FALSCH</button>
             <button class="btn-close" onclick="closeQuestion()">ZURÜCK</button>
         </div>
-        <button id="btn-next-round" class="host-only" onclick="closeQuestion()">NÄCHSTE RUNDE</button>
     </div>
 </div>
 
@@ -213,14 +197,17 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('game_state');
 
-    // Identifizierung
     const urlParams = new URLSearchParams(window.location.search);
     const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
     const isHost = (myPlayerIndex === null);
 
-    // Body-Klasse setzen, um UI Elemente via CSS zu steuern
     if (!isHost) {
         document.body.classList.add('is-player');
+        // NAME ABFRAGEN
+        const userName = prompt("Bitte gib deinen Namen ein:");
+        if (userName) {
+            db.child('players').child(myPlayerIndex).update({ name: userName });
+        }
     }
 
     const boards = {
@@ -233,12 +220,7 @@
             "KATEGORIE 6": [{pts:100,q:"Frage?",a:"Antwort"},{pts:200,q:"Frage?",a:"Antwort"},{pts:300,q:"Frage?",a:"Antwort"},{pts:500,q:"Frage?",a:"Antwort"}] 
         },
         2: { 
-            "EXTRA 1": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}],
-            "EXTRA 2": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}],
-            "EXTRA 3": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}],
-            "EXTRA 4": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}],
-            "EXTRA 5": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}],
-            "EXTRA 6": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}]
+            "EXTRA 1": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}]
         }
     };
 
@@ -256,40 +238,25 @@
         updateUI();
     });
 
-    function updateSync(changes) { 
-        if(isHost) db.update(changes); 
-        else if (changes.lastEffect === 'buzzer') db.update(changes); // Spieler darf nur Buzzer senden
-    }
-
-    function resetGame() {
-        if(!isHost) return;
-        if(confirm("Reset?")) {
-            db.set({
-                players: [{ name: "Spieler 1", score: 0, locked: false }, { name: "Spieler 2", score: 0, locked: false }, { name: "Spieler 3", score: 0, locked: false }, { name: "Spieler 4", score: 0, locked: false }, { name: "Spieler 5", score: 0, locked: false }],
-                currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, currentPoints: 0, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: 0, currentQuestion: "", currentAnswer: "", showAnswerMode: false, lastEffect: ""
-            });
-        }
-    }
-
     function updateUI() {
         if (!localState.players) return;
 
+        // Eigener Name im Logo (nur für Spieler)
         if (!isHost && localState.players[myPlayerIndex]) {
-            document.querySelector('.logo-text').innerText = "DU BIST: " + localState.players[myPlayerIndex].name;
-            document.querySelector('.logo-text').style.fontSize = "1.5rem";
+            const nameLabel = localState.players[myPlayerIndex].name || "Spieler";
+            document.querySelector('.logo-text').innerText = "DU BIST: " + nameLabel;
         }
 
         const board = document.getElementById('game-board');
         board.innerHTML = '';
-        const data = boards[localState.currentBoard];
+        const data = boards[localState.currentBoard || 1];
         if (data) {
             Object.keys(data).forEach(c => {
                 const h = document.createElement('div'); h.className = 'category-header'; h.innerText = c; board.appendChild(h);
             });
             for(let i=0; i<4; i++) {
                 Object.keys(data).forEach(c => {
-                    const qList = data[c];
-                    const q = qList[i];
+                    const q = data[c][i];
                     const cardId = `${localState.currentBoard}-${c}-${i}`;
                     const card = document.createElement('div'); card.className = 'quiz-card';
                     if(localState.usedCards?.[localState.currentBoard]?.includes(cardId)) card.classList.add('used');
@@ -306,7 +273,7 @@
             s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i && localState.activePlayerIndex === null ? 'selecting' : ''}`;
             if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
-            s.onclick = () => { if(isHost && !localState.overlayOpen) updateSync({selectingPlayerIndex: i}); };
+            s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
             area.appendChild(s);
         });
 
@@ -321,6 +288,7 @@
             statusText = "BUZZER FREI!";
         }
         document.getElementById('buzzer-status').innerText = statusText;
+        document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.activePlayerIndex !== null ? localState.players[localState.activePlayerIndex].name : "---");
     }
 
     function openQuestion(q, id) {
@@ -328,28 +296,22 @@
         let used = localState.usedCards || {1:[], 2:[]};
         if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
         used[localState.currentBoard].push(id);
-        updateSync({ 
-            overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, 
-            activePlayerIndex: null, canBuzz: true, showAnswerMode: false,
-            players: localState.players.map(p => ({...p, locked: false})) 
-        });
+        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, activePlayerIndex: null, canBuzz: true, showAnswerMode: false, players: localState.players.map(p => ({...p, locked: false})) });
     }
 
     function handleAnswer(correct) {
         if(!isHost) return;
         let players = [...localState.players];
         if(localState.activePlayerIndex === null) return;
-
         if(correct) {
             players[localState.activePlayerIndex].score += localState.currentPoints;
-            updateSync({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
-            setTimeout(() => updateSync({lastEffect: ''}), 500);
+            db.update({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
         } else {
             players[localState.activePlayerIndex].score -= (localState.currentPoints / 2);
             players[localState.activePlayerIndex].locked = true;
-            updateSync({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
-            setTimeout(() => updateSync({lastEffect: ''}), 500);
+            db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
         }
+        setTimeout(() => db.update({lastEffect: ''}), 500);
     }
 
     function triggerFlash(color) {
@@ -359,18 +321,15 @@
     }
 
     function playSound(id) { const s = document.getElementById('sound-' + id); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
-    function closeQuestion() { if(isHost) updateSync({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
-    function switchBoard(n) { if(isHost) updateSync({currentBoard: n}); }
+    function closeQuestion() { if(isHost) db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
+    function switchBoard(n) { if(isHost) db.update({currentBoard: n}); }
+    function resetGame() { if(isHost && confirm("Reset?")) db.set({ players: [{ name: "Spieler 1", score: 0, locked: false }, { name: "Spieler 2", score: 0, locked: false }, { name: "Spieler 3", score: 0, locked: false }, { name: "Spieler 4", score: 0, locked: false }, { name: "Spieler 5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, currentPoints: 0, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: 0, currentQuestion: "", currentAnswer: "", showAnswerMode: false, lastEffect: "" }); }
 
     window.addEventListener('keydown', (e) => {
-        if (!isHost && myPlayerIndex !== null) {
-            // NUR Spieler darf mit Leertaste buzzern
-            if(localState.canBuzz && e.code === "Space") {
-                if(!localState.players[myPlayerIndex].locked) {
-                    playSound('buzzer');
-                    db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
-                    setTimeout(() => db.update({lastEffect: ''}), 500);
-                }
+        if (!isHost && myPlayerIndex !== null && localState.canBuzz && e.code === "Space") {
+            if(!localState.players[myPlayerIndex].locked) {
+                db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
+                setTimeout(() => db.update({lastEffect: ''}), 500);
             }
         }
     });
