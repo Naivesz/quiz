@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeopardy Quiz Show Deluxe - No Scrollbar</title>
+    <title>Jeopardy Quiz Show Deluxe - Camera Enabled</title>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Kanit:wght@600;800;900&display=swap" rel="stylesheet">
     
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -52,12 +52,13 @@
             width: 100%; aspect-ratio: 16/9;
             background: transparent !important;
             border: 3px solid var(--red-accent); border-radius: 10px; position: relative;
+            overflow: hidden; /* Wichtig für Video-Einpassung */
         }
 
         .gm-label {
             position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
             background: var(--red-accent); padding: 2px 15px; font-size: 0.8rem;
-            font-family: var(--font-show); border-radius: 4px;
+            font-family: var(--font-show); border-radius: 4px; z-index: 2; /* Über dem Video */
         }
 
         .nav-controls { text-align: center; }
@@ -119,6 +120,7 @@
         .player-slot {
             aspect-ratio: 16/9; background: transparent !important;
             border: 2px solid #333; position: relative; border-radius: 8px;
+            overflow: hidden; /* Wichtig für Video */
         }
 
         .player-slot.active-buzzer { border-color: var(--red-accent); box-shadow: 0 0 20px var(--red-accent); }
@@ -128,6 +130,7 @@
             position: absolute; bottom: 0; width: 100%;
             background: rgba(225, 29, 72, 0.95); text-align: center;
             font-weight: 900; font-size: 1rem; padding: 5px 0; text-transform: uppercase;
+            z-index: 2; /* Über dem Video */
         }
 
         #question-overlay {
@@ -136,7 +139,6 @@
             z-index: 1050; flex-direction: column; align-items: center; justify-content: center;
         }
 
-        /* FIX: SCROLLBAR ENTFERNT */
         #question-content {
             font-size: clamp(1.5rem, 4vw, 3.2rem); 
             font-weight: 800; 
@@ -145,15 +147,12 @@
             margin: 20px 0;
             text-align: center; 
             text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
-            overflow-y: auto; /* Erlaubt scrollen technisch */
-            scrollbar-width: none; /* Firefox: Keine Leiste */
-            -ms-overflow-style: none; /* IE/Edge: Keine Leiste */
+            overflow-y: auto; 
+            scrollbar-width: none;
+            -ms-overflow-style: none;
             line-height: 1.2;
         }
-        /* Chrome/Safari: Keine Leiste */
-        #question-content::-webkit-scrollbar { 
-            display: none; 
-        }
+        #question-content::-webkit-scrollbar { display: none; }
 
         .controls { display: flex; gap: 15px; }
         button { padding: 12px 25px; font-family: var(--font-show); cursor: pointer; border: none; border-radius: 6px; color: white; }
@@ -218,10 +217,50 @@
     const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
     const isHost = (myPlayerIndex === null);
 
+    // NEU: Globale Variable für das Video-Element
+    let myVideoElement = null;
+
+    // NEU: Kamera-Initialisierungsfunktion
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            myVideoElement = document.createElement('video');
+            myVideoElement.srcObject = stream;
+            myVideoElement.autoplay = true;
+            myVideoElement.muted = true;
+            myVideoElement.playsInline = true;
+            
+            // Styling via JS für Overlay
+            myVideoElement.style.width = '100%';
+            myVideoElement.style.height = '100%';
+            myVideoElement.style.objectFit = 'cover';
+            myVideoElement.style.position = 'absolute';
+            myVideoElement.style.top = '0';
+            myVideoElement.style.left = '0';
+            myVideoElement.style.zIndex = '0'; // Hinter den Text
+
+            if (isHost) {
+                // Host: Sofort in den statischen Host-Slot einfügen
+                const hostSlot = document.querySelector('.gm-cam-slot');
+                if (hostSlot) hostSlot.insertBefore(myVideoElement, hostSlot.firstChild);
+            } else {
+                // Spieler: Wird in updateUI() dynamisch eingefügt
+                updateUI(); // Trigger update um Video anzuzeigen
+            }
+        } catch (err) {
+            console.error("Kamera Zugriff verweigert oder Fehler:", err);
+        }
+    }
+
     if (!isHost) {
         document.body.classList.add('is-player');
         const userName = prompt("Dein Name:");
-        if (userName) db.child('players').child(myPlayerIndex).update({ name: userName });
+        if (userName) {
+            db.child('players').child(myPlayerIndex).update({ name: userName });
+            initCamera(); // NEU: Kamera anfragen nach Name
+        }
+    } else {
+        initCamera(); // NEU: Host fragt Kamera sofort an
     }
 
     let audioUnlocked = false;
@@ -317,6 +356,15 @@
             s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
             area.appendChild(s);
         });
+
+        // NEU: Wenn ich Spieler bin und mein Video existiert, hänge es in meinen Slot wieder ein
+        if (!isHost && myVideoElement && myPlayerIndex !== null) {
+            if (area.children[myPlayerIndex]) {
+                const mySlot = area.children[myPlayerIndex];
+                // InsertBefore damit es hinter dem player-info div (welches z-index > 0 hat) liegt
+                mySlot.insertBefore(myVideoElement, mySlot.firstChild);
+            }
+        }
 
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
