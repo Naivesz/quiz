@@ -32,13 +32,16 @@
             display: flex; flex-direction: column;
         }
 
-        /* Versteckt Steuerungselemente für Spieler */
+        /* --- NEU: ABSOLUTE KLICK-SPERRE FÜR SPIELER --- */
+        body.is-player button, 
+        body.is-player .quiz-card, 
+        body.is-player .player-slot {
+            pointer-events: none !important; /* Deaktiviert alle Maus-Interaktionen */
+            cursor: default !important;
+        }
+
         body.is-player .host-only {
             display: none !important;
-        }
-        
-        body.is-player .quiz-card {
-            cursor: default !important;
         }
 
         #flash-overlay {
@@ -258,7 +261,6 @@
 
     function updateSync(changes) { 
         if(isHost) db.update(changes); 
-        else if (changes.lastEffect === 'buzzer') db.update(changes); // Spieler darf nur Buzzer senden
     }
 
     function resetGame() {
@@ -304,7 +306,7 @@
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
             s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i && localState.activePlayerIndex === null ? 'selecting' : ''}`;
-            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
+            if(!isHost && i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
             s.onclick = () => { if(isHost && !localState.overlayOpen) updateSync({selectingPlayerIndex: i}); };
             area.appendChild(s);
@@ -364,7 +366,6 @@
 
     window.addEventListener('keydown', (e) => {
         if (!isHost && myPlayerIndex !== null) {
-            // NUR Spieler darf mit Leertaste buzzern
             if(localState.canBuzz && e.code === "Space") {
                 if(!localState.players[myPlayerIndex].locked) {
                     playSound('buzzer');
