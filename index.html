@@ -312,4 +312,87 @@
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
             s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i ? 'selecting' : ''}`;
-            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold
+            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
+            s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
+            s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
+            area.appendChild(s);
+        });
+
+        const overlay = document.getElementById('question-overlay');
+        overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
+        
+        if (localState.overlayOpen) {
+            document.getElementById('question-content').innerText = localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion;
+        }
+        
+        let statusText = "";
+        if(localState.activePlayerIndex !== null) {
+            statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
+        } else if(localState.canBuzz) {
+            statusText = "BUZZER FREI!";
+        } else if (localState.selectingPlayerIndex !== null && !localState.showAnswerMode) {
+             statusText = localState.players[localState.selectingPlayerIndex].name + " ist dran...";
+        }
+
+        document.getElementById('buzzer-status').innerText = statusText;
+        document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.selectingPlayerIndex !== null ? localState.players[localState.selectingPlayerIndex].name : "---");
+        
+        document.getElementById('btn-b1').className = currentB === 1 ? 'btn-nav active' : 'btn-nav';
+        document.getElementById('btn-b2').className = currentB === 2 ? 'btn-nav active' : 'btn-nav';
+    }
+
+    function openQuestion(q, id) {
+        let used = localState.usedCards || {1:[], 2:[]};
+        if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
+        used[localState.currentBoard].push(id);
+        
+        let activeP = localState.selectingPlayerIndex !== undefined ? localState.selectingPlayerIndex : null;
+        let buzzAllowed = (activeP === null);
+        
+        db.update({ 
+            overlayOpen: true, 
+            currentQuestion: q.q, 
+            currentAnswer: q.a, 
+            currentPoints: q.pts, 
+            usedCards: used, 
+            activePlayerIndex: activeP,
+            canBuzz: buzzAllowed, 
+            showAnswerMode: false, 
+            lastEffect: '',
+            players: localState.players.map(p => ({...p, locked: false})) 
+        });
+    }
+
+    function handleAnswer(correct) {
+        if(localState.activePlayerIndex === null) return;
+        let players = [...localState.players];
+        if(correct) {
+            players[localState.activePlayerIndex].score += localState.currentPoints;
+            db.update({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
+        } else {
+            players[localState.activePlayerIndex].score -= (localState.currentPoints / 2);
+            players[localState.activePlayerIndex].locked = true;
+            db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
+        }
+    }
+
+    function triggerFlash(color) {
+        const flash = document.getElementById('flash-overlay');
+        flash.style.backgroundColor = color === 'green' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(225, 29, 72, 0.4)';
+        flash.style.opacity = '1'; setTimeout(() => flash.style.opacity = '0', 300);
+    }
+
+    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false, lastEffect: ''}); }
+    function switchBoard(n) { db.update({currentBoard: n}); }
+    function resetGame() { if(confirm("Reset?")) db.set({ players: [{ name: "S1", score: 0, locked: false }, { name: "S2", score: 0, locked: false }, { name: "S3", score: 0, locked: false }, { name: "S4", score: 0, locked: false }, { name: "S5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: null, showAnswerMode: false, lastEffect: "" }); }
+
+    window.addEventListener('keydown', (e) => {
+        if (!isHost && myPlayerIndex !== null && localState.canBuzz && e.code === "Space") {
+            if(!localState.players[myPlayerIndex].locked) {
+                db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
+            }
+        }
+    });
+</script>
+</body>
+</html>
