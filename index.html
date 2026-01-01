@@ -136,19 +136,17 @@
             z-index: 1050; flex-direction: column; align-items: center; justify-content: center;
         }
 
-        /* FIX FÜR ABGECUTTETE FRAGEN */
+        /* FIX FÜR ABGECUTTETE FRAGEN - SCHRIFT SKALIERT */
         #question-content {
-            font-size: clamp(1.5rem, 4vh, 3.2rem); /* Skaliert automatisch zwischen 1.5rem und 3.2rem */
+            font-size: clamp(1.2rem, 5vh, 3.2rem); 
             font-weight: 800; 
             max-width: 85%; 
-            max-height: 60vh; /* Verhindert das Hinausragen */
+            max-height: 70vh;
             margin: 20px 0;
             text-align: center; 
             text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
-            overflow-y: auto; /* Erlaubt Scrollen falls es EXTREM lang ist */
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            overflow-y: auto;
+            line-height: 1.2;
         }
 
         .controls { display: flex; gap: 15px; }
@@ -158,7 +156,9 @@
         .btn-close { background: #475569; }
     </style>
 </head>
-<body>
+<body onclick="unlockAudio()"> <audio id="sound-correct" src="correct.mp3" preload="auto"></audio>
+<audio id="sound-wrong" src="wrong.mp3" preload="auto"></audio>
+<audio id="sound-buzzer" src="buzzer.mp3" preload="auto"></audio>
 
 <div id="flash-overlay"></div>
 
@@ -193,13 +193,6 @@
 <div class="player-area" id="player-area"></div>
 
 <script>
-    // Audio Quellen
-    const sounds = {
-        buzzer: new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'),
-        correct: new Audio('https://actions.google.com/sounds/v1/cartoon/success_musical_fanfare.ogg'),
-        wrong: new Audio('https://actions.google.com/sounds/v1/cartoon/boing.ogg')
-    };
-
     const firebaseConfig = {
       apiKey: "AIzaSyBP2hzronbnt530dAEr906xMS8xzmg3bpo",
       authDomain: "quizshownaives.firebaseapp.com",
@@ -217,10 +210,14 @@
     const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
     const isHost = (myPlayerIndex === null);
 
-    if (!isHost) {
-        document.body.classList.add('is-player');
-        const userName = prompt("Dein Name:");
-        if (userName) db.child('players').child(myPlayerIndex).update({ name: userName });
+    let audioUnlocked = false;
+    function unlockAudio() {
+        if(audioUnlocked) return;
+        ['correct', 'wrong', 'buzzer'].forEach(id => {
+            const a = document.getElementById('sound-' + id);
+            a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{});
+        });
+        audioUnlocked = true;
     }
 
     const boards = {
@@ -248,10 +245,13 @@
         const newState = snapshot.val();
         if(!newState || !newState.players) return;
         
-        // SOUND LOGIK
-        if(newState.lastEffect === 'correct' && localState.lastEffect !== 'correct') { triggerFlash('green'); sounds.correct.play().catch(e=>{}); }
-        if(newState.lastEffect === 'wrong' && localState.lastEffect !== 'wrong') { triggerFlash('red'); sounds.wrong.play().catch(e=>{}); }
-        if(newState.lastEffect === 'buzzer' && localState.lastEffect !== 'buzzer') { sounds.buzzer.play().catch(e=>{}); }
+        // SOUNDS ABSPIELEN
+        if(newState.lastEffect && newState.lastEffect !== localState.lastEffect) {
+            if(newState.lastEffect === 'correct') triggerFlash('green');
+            if(newState.lastEffect === 'wrong') triggerFlash('red');
+            const s = document.getElementById('sound-' + newState.lastEffect);
+            if(s) { s.currentTime = 0; s.play().catch(()=>{}); }
+        }
 
         localState = newState;
         updateUI();
@@ -299,16 +299,9 @@
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
         
-        // FIX: SICHTBARKEIT DER FRAGE FÜR SPIELER
-        // Spieler sehen die Frage, wenn: sie Host sind ODER der Buzzer aktiv ist ODER die Antwort gezeigt wird ODER der Host die Frage offen hat
-        const showQuestionToAll = isHost || localState.activePlayerIndex !== null || localState.showAnswerMode || localState.overlayOpen;
-        
-        if (localState.showAnswerMode) {
-            document.getElementById('question-content').innerText = localState.currentAnswer;
-        } else if (showQuestionToAll) {
-            document.getElementById('question-content').innerText = localState.currentQuestion;
-        } else {
-            document.getElementById('question-content').innerText = "???";
+        // FIX: SPIELER SEHEN FRAGE
+        if (localState.overlayOpen) {
+            document.getElementById('question-content').innerText = localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion;
         }
         
         let statusText = "";
@@ -325,7 +318,7 @@
         let used = localState.usedCards || {1:[], 2:[]};
         if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
         used[localState.currentBoard].push(id);
-        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, activePlayerIndex: null, canBuzz: true, showAnswerMode: false, players: localState.players.map(p => ({...p, locked: false})) });
+        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, activePlayerIndex: null, canBuzz: true, showAnswerMode: false, lastEffect: 'buzzer', players: localState.players.map(p => ({...p, locked: false})) });
     }
 
     function handleAnswer(correct) {
@@ -339,7 +332,6 @@
             players[localState.activePlayerIndex].locked = true;
             db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
         }
-        setTimeout(() => db.update({lastEffect: ''}), 500);
     }
 
     function triggerFlash(color) {
@@ -348,7 +340,7 @@
         flash.style.opacity = '1'; setTimeout(() => flash.style.opacity = '0', 300);
     }
 
-    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
+    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false, lastEffect: ''}); }
     function switchBoard(n) { db.update({currentBoard: n}); }
     function resetGame() { if(confirm("Reset?")) db.set({ players: [{ name: "S1", score: 0, locked: false }, { name: "S2", score: 0, locked: false }, { name: "S3", score: 0, locked: false }, { name: "S4", score: 0, locked: false }, { name: "S5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: 0, showAnswerMode: false, lastEffect: "" }); }
 
@@ -356,7 +348,6 @@
         if (!isHost && myPlayerIndex !== null && localState.canBuzz && e.code === "Space") {
             if(!localState.players[myPlayerIndex].locked) {
                 db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
-                setTimeout(() => db.update({lastEffect: ''}), 500);
             }
         }
     });
