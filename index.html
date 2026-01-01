@@ -50,18 +50,31 @@
             flex-shrink: 0; z-index: 1100;
         }
 
+        /* ANPASSUNG START: Host Cam Slot */
         .gm-cam-slot {
             width: 100%; aspect-ratio: 16/9;
             background: transparent !important;
             border: 3px solid var(--red-accent); border-radius: 10px; position: relative;
-            overflow: hidden;
+            /* WICHTIG: Visible statt hidden, damit das Label über den Rand ragen kann */
+            overflow: visible !important; 
+        }
+
+        /* Damit das Video trotzdem abgerundet ist (da der Parent nicht mehr clippt) */
+        .gm-cam-slot video {
+            border-radius: 7px; /* Etwas weniger als der Parent-Border-Radius */
         }
 
         .gm-label {
-            position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+            position: absolute; 
+            bottom: -12px; /* Leicht unterhalb des Rahmens positioniert */
+            left: 50%; transform: translateX(-50%);
             background: var(--red-accent); padding: 2px 15px; font-size: 0.8rem;
-            font-family: var(--font-show); border-radius: 4px; z-index: 2;
+            font-family: var(--font-show); border-radius: 4px; 
+            /* WICHTIG: Hoher Z-Index um vor Video und Rahmen zu liegen */
+            z-index: 100; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5); /* Kleine optische Hilfe zur Trennung */
         }
+        /* ANPASSUNG ENDE */
 
         .nav-controls { text-align: center; }
         .logo-text { font-family: var(--font-show); font-size: 2.2rem; color: var(--text-gold); margin: 0; }
@@ -246,7 +259,6 @@
                 if(!isHost && myPlayerIndex !== null) {
                     db.child('players').child(myPlayerIndex).update({ peerId: id });
                 } else if (isHost) {
-                    // FIX: Host muss seine ID global speichern, damit Spieler sie finden
                     db.update({ hostPeerId: id });
                 }
             });
@@ -280,11 +292,9 @@
     }
 
     function handleIncomingStream(peerId, stream) {
-        // FIX: Prüfen, ob der Stream vom Host kommt
         if (localState.hostPeerId && peerId === localState.hostPeerId) {
             const hostSlot = document.querySelector('.gm-cam-slot');
             if (hostSlot) {
-                // Bestehendes Video entfernen, falls vorhanden
                 const existing = hostSlot.querySelector('video');
                 if(existing && existing !== myVideoElement) existing.remove();
                 
@@ -397,7 +407,6 @@
             });
         }
 
-        // FIX: Auch Verbindung zum Host aufbauen, falls noch nicht geschehen
         if (!isHost && myPeer && localState.hostPeerId && !peers[localState.hostPeerId]) {
             const call = myPeer.call(localState.hostPeerId, localStream);
             peers[localState.hostPeerId] = call;
@@ -437,7 +446,6 @@
                 const call = myPeer.call(p.peerId, localStream);
                 peers[p.peerId] = call;
                 call.on('stream', (remoteStream) => {
-                   // ID-Lookup für korrekte Zuweisung, falls p.peerId direkt übergeben wird
                    handleIncomingStream(p.peerId, remoteStream);
                 });
             }
