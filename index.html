@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeopardy Quiz Show Deluxe - Final Stable</title>
+    <title>Jeopardy Quiz Show Deluxe - Final Fixed</title>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Kanit:wght@600;800;900&display=swap" rel="stylesheet">
     
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -83,7 +83,6 @@
 
         #board-container { position: relative; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* FIX: Stabiles 6-Spalten Grid */
         #game-board {
             display: grid; 
             grid-template-columns: repeat(6, 1fr);
@@ -137,9 +136,17 @@
             z-index: 1050; flex-direction: column; align-items: center; justify-content: center;
         }
 
+        /* FIX FÜR ABGECUTTETE FRAGEN - SCHRIFT SKALIERT UND SCROLLBAR */
         #question-content {
-            font-size: 3.2rem; font-weight: 800; max-width: 85%; margin: 20px 0;
-            text-align: center; text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
+            font-size: clamp(1.5rem, 4vw, 3.2rem); 
+            font-weight: 800; 
+            max-width: 85%; 
+            max-height: 60vh;
+            margin: 20px 0;
+            text-align: center; 
+            text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
+            overflow-y: auto;
+            line-height: 1.2;
         }
 
         .controls { display: flex; gap: 15px; }
@@ -149,7 +156,9 @@
         .btn-close { background: #475569; }
     </style>
 </head>
-<body>
+<body onclick="unlockAudio()"> <audio id="sound-correct" src="correct.mp3" preload="auto"></audio>
+<audio id="sound-wrong" src="wrong.mp3" preload="auto"></audio>
+<audio id="sound-buzzer" src="buzzer.mp3" preload="auto"></audio>
 
 <div id="flash-overlay"></div>
 
@@ -207,7 +216,23 @@
         if (userName) db.child('players').child(myPlayerIndex).update({ name: userName });
     }
 
-    // Boards mit exakt 6 Kategorien-Slots für stabiles Layout
+    // AUDIO LOGIK
+    let audioUnlocked = false;
+    function unlockAudio() {
+        if(audioUnlocked) return;
+        ['correct', 'wrong', 'buzzer'].forEach(id => {
+            const a = document.getElementById('sound-' + id);
+            // Versucht stumm abzuspielen um den Browser zu "entsperren"
+            a.volume = 0; 
+            a.play().then(() => { 
+                a.pause(); 
+                a.currentTime = 0; 
+                a.volume = 1; 
+            }).catch(()=>{});
+        });
+        audioUnlocked = true;
+    }
+
     const boards = {
         1: { 
             "KATEGORIE 1": [{pts:100,q:"Frage",a:"A"},{pts:200,q:"Frage",a:"A"},{pts:300,q:"Frage",a:"A"},{pts:500,q:"Frage",a:"A"}],
@@ -233,8 +258,17 @@
         const newState = snapshot.val();
         if(!newState || !newState.players) return;
         
-        if(newState.lastEffect === 'correct' && localState.lastEffect !== 'correct') triggerFlash('green');
-        if(newState.lastEffect === 'wrong' && localState.lastEffect !== 'wrong') triggerFlash('red');
+        // SOUNDS ABSPIELEN
+        if(newState.lastEffect && newState.lastEffect !== localState.lastEffect) {
+            if(newState.lastEffect === 'correct') triggerFlash('green');
+            if(newState.lastEffect === 'wrong') triggerFlash('red');
+            const s = document.getElementById('sound-' + newState.lastEffect);
+            if(s) { 
+                s.currentTime = 0; 
+                s.volume = 1;
+                s.play().catch(e => console.log("Audio play error", e)); 
+            }
+        }
 
         localState = newState;
         updateUI();
@@ -253,12 +287,10 @@
         const data = boards[currentB];
         const cats = Object.keys(data);
 
-        // Header
         cats.forEach(c => {
             const h = document.createElement('div'); h.className = 'category-header'; h.innerText = c; board.appendChild(h);
         });
 
-        // Karten Zeilenweise
         for(let i=0; i<4; i++) {
             cats.forEach(c => {
                 const q = data[c][i];
@@ -274,20 +306,33 @@
         const area = document.getElementById('player-area'); area.innerHTML = '';
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
-            s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i && localState.activePlayerIndex === null ? 'selecting' : ''}`;
+            // Logik: Markiere Spieler gelb, wenn er "Am Zug" (selecting) ist, solange keine Frage offen ist oder er antwortet
+            s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i ? 'selecting' : ''}`;
             if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
+            // HOST KANN SPIELER WÄHLEN DER DRAN IST
             s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
             area.appendChild(s);
         });
 
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
-        document.getElementById('question-content').innerText = (localState.showAnswerMode || isHost) ? (localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion) : "???";
         
+        // FIX: ALLE SEHEN FRAGE
+        if (localState.overlayOpen) {
+            document.getElementById('question-content').innerText = localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion;
+        }
+        
+        // FIX: RICHTIGER STATUS TEXT
         let statusText = "";
-        if(localState.activePlayerIndex !== null) statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
-        else if(localState.canBuzz) statusText = "BUZZER FREI!";
+        if(localState.activePlayerIndex !== null) {
+            statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
+        } else if(localState.canBuzz) {
+            statusText = "BUZZER FREI!";
+        } else if (localState.selectingPlayerIndex !== null && !localState.showAnswerMode) {
+             statusText = localState.players[localState.selectingPlayerIndex].name + " ist dran...";
+        }
+
         document.getElementById('buzzer-status').innerText = statusText;
         document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.selectingPlayerIndex !== null ? localState.players[localState.selectingPlayerIndex].name : "---");
         
@@ -299,7 +344,23 @@
         let used = localState.usedCards || {1:[], 2:[]};
         if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
         used[localState.currentBoard].push(id);
-        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, activePlayerIndex: null, canBuzz: true, showAnswerMode: false, players: localState.players.map(p => ({...p, locked: false})) });
+        
+        // LOGIK: Wenn jemand "Am Zug" ist, darf nur er antworten (activePlayer gesetzt). Sonst Buzzer frei.
+        let activeP = localState.selectingPlayerIndex !== undefined ? localState.selectingPlayerIndex : null;
+        let buzzAllowed = (activeP === null); // Wenn niemand ausgewählt, Buzzer frei
+        
+        db.update({ 
+            overlayOpen: true, 
+            currentQuestion: q.q, 
+            currentAnswer: q.a, 
+            currentPoints: q.pts, 
+            usedCards: used, 
+            activePlayerIndex: activeP, // Sofort den ausgewählten Spieler aktivieren
+            canBuzz: buzzAllowed, 
+            showAnswerMode: false, 
+            lastEffect: '', // Reset effect
+            players: localState.players.map(p => ({...p, locked: false})) 
+        });
     }
 
     function handleAnswer(correct) {
@@ -307,13 +368,14 @@
         let players = [...localState.players];
         if(correct) {
             players[localState.activePlayerIndex].score += localState.currentPoints;
+            // Selecting Player bleibt gleich (hat ja richtig geantwortet) oder Host wählt neu
             db.update({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
         } else {
             players[localState.activePlayerIndex].score -= (localState.currentPoints / 2);
             players[localState.activePlayerIndex].locked = true;
+            // LOGIK: Falsche Antwort -> Aktiver Spieler weg -> Buzzer für ALLE ANDEREN frei
             db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
         }
-        setTimeout(() => db.update({lastEffect: ''}), 500);
     }
 
     function triggerFlash(color) {
@@ -322,15 +384,14 @@
         flash.style.opacity = '1'; setTimeout(() => flash.style.opacity = '0', 300);
     }
 
-    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
+    function closeQuestion() { db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false, lastEffect: ''}); }
     function switchBoard(n) { db.update({currentBoard: n}); }
-    function resetGame() { if(confirm("Reset?")) db.set({ players: [{ name: "S1", score: 0, locked: false }, { name: "S2", score: 0, locked: false }, { name: "S3", score: 0, locked: false }, { name: "S4", score: 0, locked: false }, { name: "S5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: 0, showAnswerMode: false, lastEffect: "" }); }
+    function resetGame() { if(confirm("Reset?")) db.set({ players: [{ name: "S1", score: 0, locked: false }, { name: "S2", score: 0, locked: false }, { name: "S3", score: 0, locked: false }, { name: "S4", score: 0, locked: false }, { name: "S5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: null, showAnswerMode: false, lastEffect: "" }); }
 
     window.addEventListener('keydown', (e) => {
         if (!isHost && myPlayerIndex !== null && localState.canBuzz && e.code === "Space") {
             if(!localState.players[myPlayerIndex].locked) {
                 db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
-                setTimeout(() => db.update({lastEffect: ''}), 500);
             }
         }
     });
