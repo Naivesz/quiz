@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeopardy Quiz Show Deluxe - Final Stable</title>
+    <title>Jeopardy Quiz Show Deluxe - Final Fixed</title>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Kanit:wght@600;800;900&display=swap" rel="stylesheet">
     
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -83,7 +83,6 @@
 
         #board-container { position: relative; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* FIX: Stabiles 6-Spalten Grid */
         #game-board {
             display: grid; 
             grid-template-columns: repeat(6, 1fr);
@@ -137,9 +136,19 @@
             z-index: 1050; flex-direction: column; align-items: center; justify-content: center;
         }
 
+        /* FIX FÜR ABGECUTTETE FRAGEN */
         #question-content {
-            font-size: 3.2rem; font-weight: 800; max-width: 85%; margin: 20px 0;
-            text-align: center; text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
+            font-size: clamp(1.5rem, 4vh, 3.2rem); /* Skaliert automatisch zwischen 1.5rem und 3.2rem */
+            font-weight: 800; 
+            max-width: 85%; 
+            max-height: 60vh; /* Verhindert das Hinausragen */
+            margin: 20px 0;
+            text-align: center; 
+            text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
+            overflow-y: auto; /* Erlaubt Scrollen falls es EXTREM lang ist */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .controls { display: flex; gap: 15px; }
@@ -184,6 +193,13 @@
 <div class="player-area" id="player-area"></div>
 
 <script>
+    // Audio Quellen
+    const sounds = {
+        buzzer: new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'),
+        correct: new Audio('https://actions.google.com/sounds/v1/cartoon/success_musical_fanfare.ogg'),
+        wrong: new Audio('https://actions.google.com/sounds/v1/cartoon/boing.ogg')
+    };
+
     const firebaseConfig = {
       apiKey: "AIzaSyBP2hzronbnt530dAEr906xMS8xzmg3bpo",
       authDomain: "quizshownaives.firebaseapp.com",
@@ -207,7 +223,6 @@
         if (userName) db.child('players').child(myPlayerIndex).update({ name: userName });
     }
 
-    // Boards mit exakt 6 Kategorien-Slots für stabiles Layout
     const boards = {
         1: { 
             "KATEGORIE 1": [{pts:100,q:"Frage",a:"A"},{pts:200,q:"Frage",a:"A"},{pts:300,q:"Frage",a:"A"},{pts:500,q:"Frage",a:"A"}],
@@ -233,8 +248,10 @@
         const newState = snapshot.val();
         if(!newState || !newState.players) return;
         
-        if(newState.lastEffect === 'correct' && localState.lastEffect !== 'correct') triggerFlash('green');
-        if(newState.lastEffect === 'wrong' && localState.lastEffect !== 'wrong') triggerFlash('red');
+        // SOUND LOGIK
+        if(newState.lastEffect === 'correct' && localState.lastEffect !== 'correct') { triggerFlash('green'); sounds.correct.play().catch(e=>{}); }
+        if(newState.lastEffect === 'wrong' && localState.lastEffect !== 'wrong') { triggerFlash('red'); sounds.wrong.play().catch(e=>{}); }
+        if(newState.lastEffect === 'buzzer' && localState.lastEffect !== 'buzzer') { sounds.buzzer.play().catch(e=>{}); }
 
         localState = newState;
         updateUI();
@@ -253,12 +270,10 @@
         const data = boards[currentB];
         const cats = Object.keys(data);
 
-        // Header
         cats.forEach(c => {
             const h = document.createElement('div'); h.className = 'category-header'; h.innerText = c; board.appendChild(h);
         });
 
-        // Karten Zeilenweise
         for(let i=0; i<4; i++) {
             cats.forEach(c => {
                 const q = data[c][i];
@@ -283,7 +298,18 @@
 
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
-        document.getElementById('question-content').innerText = (localState.showAnswerMode || isHost) ? (localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion) : "???";
+        
+        // FIX: SICHTBARKEIT DER FRAGE FÜR SPIELER
+        // Spieler sehen die Frage, wenn: sie Host sind ODER der Buzzer aktiv ist ODER die Antwort gezeigt wird ODER der Host die Frage offen hat
+        const showQuestionToAll = isHost || localState.activePlayerIndex !== null || localState.showAnswerMode || localState.overlayOpen;
+        
+        if (localState.showAnswerMode) {
+            document.getElementById('question-content').innerText = localState.currentAnswer;
+        } else if (showQuestionToAll) {
+            document.getElementById('question-content').innerText = localState.currentQuestion;
+        } else {
+            document.getElementById('question-content').innerText = "???";
+        }
         
         let statusText = "";
         if(localState.activePlayerIndex !== null) statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
