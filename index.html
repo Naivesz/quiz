@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz Duell - Grouped Layout</title>
+    <title>Jeopardy Quiz Show Deluxe - Grouped & Fixed</title>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Kanit:wght@600;800;900&display=swap" rel="stylesheet">
+    
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -15,120 +16,119 @@
             --blue-card: #1e3a8a;
             --blue-highlight: #3b82f6;
             --red-accent: #e11d48;
+            --green-success: #22c55e;
             --text-gold: #fde047;
             --font-show: 'Anton', sans-serif;
             --font-text: 'Kanit', sans-serif;
             
-            /* HIER KANNST DU DIE HÖHEN EINFACH ANPASSEN */
-            --header-height: 150px;
+            /* Größen-Steuerung der Gruppen */
+            --header-height: 140px;
             --footer-height: 180px;
         }
 
         html, body {
-            background-color: var(--blue-dark);
+            background-color: transparent !important;
             margin: 0; padding: 0;
             height: 100vh; width: 100vw;
-            color: white; font-family: var(--font-text);
+            overflow: hidden;
+            color: white;
+            font-family: var(--font-text);
+            display: flex; flex-direction: column;
+        }
+
+        body.is-player .host-only { display: none !important; }
+        body.is-player .quiz-card { cursor: default !important; }
+
+        /* --- GRUPPE 1: OBEN (Header & Status) --- */
+        .group-top {
+            height: var(--header-height);
+            display: grid; grid-template-columns: 20% 1fr 20%; 
+            align-items: center; padding: 0 30px;
+            background: var(--blue-dark); border-bottom: 3px solid var(--blue-highlight);
+            flex-shrink: 0; z-index: 1100;
+        }
+
+        /* --- GRUPPE 2: MITTE (Board & Fragen) --- */
+        .group-middle {
+            flex-grow: 1; 
+            position: relative;
+            background: var(--blue-dark);
             display: flex; flex-direction: column;
             overflow: hidden;
         }
 
-        /* --- GRUPPE 1: TOP AREA (Header & Status) --- */
-        .group-header {
-            height: var(--header-height);
-            display: grid; grid-template-columns: 250px 1fr 250px;
-            align-items: center; padding: 0 30px;
-            background: var(--blue-dark);
-            border-bottom: 3px solid var(--blue-highlight);
-            flex-shrink: 0;
-        }
-
-        /* --- GRUPPE 2: MIDDLE AREA (Das Quiz-Board) --- */
-        .group-main-board {
-            flex-grow: 1; /* Nimmt den restlichen Platz ein */
-            display: flex; flex-direction: column;
-            position: relative;
-            background: rgba(0,0,0,0.3);
-            overflow-y: auto; /* Falls Fragen mal zu groß werden */
-        }
-
-        /* --- GRUPPE 3: BOTTOM AREA (Spieler-Slots) --- */
-        .group-footer {
+        /* --- GRUPPE 3: UNTEN (Spieler) --- */
+        .group-bottom {
             height: var(--footer-height);
-            background: var(--blue-dark);
-            border-top: 5px solid var(--blue-highlight);
             display: grid; grid-template-columns: repeat(5, 1fr);
             gap: 15px; padding: 15px 30px;
-            flex-shrink: 0;
+            background: var(--blue-dark); border-top: 5px solid var(--blue-highlight);
+            flex-shrink: 0; z-index: 1100;
         }
 
-        /* Design-Elemente innerhalb der Gruppen */
-        .gm-cam-box { width: 100%; aspect-ratio: 16/9; border: 3px solid var(--red-accent); border-radius: 10px; position: relative; }
-        .gm-label { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); background: var(--red-accent); padding: 2px 12px; font-family: var(--font-show); font-size: 0.8rem; border-radius: 4px; }
+        /* Design-Elemente (Original-Styles) */
+        .gm-cam-slot { width: 100%; aspect-ratio: 16/9; border: 3px solid var(--red-accent); border-radius: 10px; position: relative; }
+        .gm-label { position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); background: var(--red-accent); padding: 2px 15px; font-size: 0.8rem; font-family: var(--font-show); border-radius: 4px; }
+        .logo-text { font-family: var(--font-show); font-size: 2.2rem; color: var(--text-gold); margin: 0; text-align: center; }
+        .btn-nav { background: var(--blue-card); border: 1px solid var(--blue-highlight); color: white; padding: 5px 15px; font-family: var(--font-show); cursor: pointer; margin: 5px 2px; border-radius: 4px; }
+        .btn-nav.active { background: var(--blue-highlight); box-shadow: 0 0 10px var(--blue-highlight); }
+        .btn-reset { background: var(--red-accent); border: none; color: white; padding: 8px 15px; font-family: var(--font-show); cursor: pointer; border-radius: 4px; }
+        #current-turn-display { font-family: var(--font-show); color: var(--text-gold); font-size: 1.6rem; text-transform: uppercase; text-align: right; }
+
+        #game-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 15px 30px; height: 100%; }
+        .category-header { background: linear-gradient(to bottom, var(--red-accent), #991b1b); padding: 10px 5px; text-align: center; font-family: var(--font-show); font-size: 1.1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); }
+        .quiz-card { background: linear-gradient(145deg, var(--blue-card), var(--blue-main)); border: 2px solid var(--blue-highlight); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-family: var(--font-show); color: var(--text-gold); cursor: pointer; }
+        .quiz-card.used { opacity: 0.05; cursor: default; }
+
+        #question-overlay { display: none; position: absolute; inset: 0; background: rgba(2, 6, 23, 0.98); backdrop-filter: blur(15px); z-index: 1050; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #question-content { font-size: 3.2rem; font-weight: 800; max-width: 85%; margin: 20px 0; text-shadow: 2px 2px 15px rgba(0,0,0,0.9); }
         
-        #game-board {
-            display: grid; grid-template-columns: repeat(6, 1fr);
-            gap: 10px; padding: 20px;
-        }
-
-        .category-header { background: linear-gradient(to bottom, var(--red-accent), #991b1b); padding: 10px; text-align: center; font-family: var(--font-show); border-radius: 6px; }
-        .quiz-card { background: linear-gradient(145deg, var(--blue-card), var(--blue-main)); border: 2px solid var(--blue-highlight); border-radius: 6px; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-family: var(--font-show); color: var(--text-gold); cursor: pointer; }
-        .quiz-card.used { opacity: 0.05; }
-
-        .player-slot { border: 2px solid #333; border-radius: 8px; position: relative; aspect-ratio: 16/9; }
-        .player-slot.active-buzzer { border-color: var(--red-accent); box-shadow: 0 0 15px var(--red-accent); }
-        .player-info { position: absolute; bottom: 0; width: 100%; background: var(--red-accent); text-align: center; font-weight: 800; padding: 4px 0; }
-
-        #question-overlay { display: none; position: absolute; inset: 0; background: rgba(2,6,23,0.98); z-index: 100; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .player-slot { aspect-ratio: 16/9; border: 2px solid #333; position: relative; border-radius: 8px; }
+        .player-slot.active-buzzer { border-color: var(--red-accent); box-shadow: 0 0 20px var(--red-accent); }
+        .player-info { position: absolute; bottom: 0; width: 100%; background: rgba(225, 29, 72, 0.95); text-align: center; font-weight: 900; padding: 5px 0; text-transform: uppercase; }
         
-        button { cursor: pointer; font-family: var(--font-show); border: none; border-radius: 4px; color: white; }
-        .host-only { display: none; }
-        body.is-host .host-only { display: block; }
+        #flash-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 2000; opacity: 0; transition: opacity 0.1s; }
     </style>
 </head>
-<body onclick="enableAudio()">
+<body onclick="unlockAudio()">
 
-    <audio id="snd-correct" src="correct.mp3"></audio>
-    <audio id="snd-wrong" src="wrong.mp3"></audio>
-    <audio id="snd-buzzer" src="buzzer.mp3"></audio>
+<audio id="sound-correct" src="correct.mp3" preload="auto"></audio>
+<audio id="sound-wrong" src="wrong.mp3" preload="auto"></audio>
+<audio id="sound-buzzer" src="buzzer.mp3" preload="auto"></audio>
 
-    <header class="group-header">
-        <div class="gm-cam-box">
-            <div class="gm-label">NAIVES</div>
+<div id="flash-overlay"></div>
+
+<header class="group-top">
+    <div class="gm-cam-slot"><div class="gm-label">NAIVES</div></div>
+    <div class="nav-controls">
+        <h1 class="logo-text">QUIZ DUELL</h1>
+        <div class="host-only">
+            <button id="btn-b1" class="btn-nav active" onclick="switchBoard(1)">BOARD 1</button>
+            <button id="btn-b2" class="btn-nav" onclick="switchBoard(2)">BOARD 2</button>
         </div>
-        
-        <div style="text-align: center;">
-            <h1 id="identity-display" style="font-family: var(--font-show); color: var(--text-gold); margin: 0;">QUIZ DUELL</h1>
-            <div class="host-only" style="margin-top: 10px;">
-                <button onclick="switchBoard(1)" style="background:var(--blue-highlight); padding:5px 15px;">BOARD 1</button>
-                <button onclick="switchBoard(2)" style="background:var(--blue-highlight); padding:5px 15px;">BOARD 2</button>
-            </div>
-        </div>
+    </div>
+    <div class="turn-container">
+        <button class="btn-reset host-only" onclick="resetGame()">RESET</button>
+        <div id="current-turn-display">AM ZUG: -</div>
+    </div>
+</header>
 
-        <div style="text-align: right;">
-            <button class="host-only" onclick="resetGame()" style="background:var(--red-accent); padding:5px 10px; margin-bottom:10px;">RESET</button>
-            <div id="current-turn-display" style="font-family: var(--font-show); color: var(--text-gold); font-size: 1.4rem;">AM ZUG: -</div>
+<main class="group-middle">
+    <div id="game-board"></div>
+    <div id="question-overlay">
+        <div id="buzzer-status" style="font-family: var(--font-show); font-size: 2rem; color: var(--text-gold);"></div>
+        <div id="question-content"></div>
+        <div class="host-only" style="display:flex; gap:15px; margin-top:20px;">
+            <button onclick="handleAnswer(true)" style="background:var(--green-success); padding:10px 20px; font-family:var(--font-show);">RICHTIG</button>
+            <button onclick="handleAnswer(false)" style="background:var(--red-accent); padding:10px 20px; font-family:var(--font-show);">FALSCH</button>
+            <button onclick="closeQuestion()" style="background:#475569; padding:10px 20px; font-family:var(--font-show);">ZURÜCK</button>
         </div>
-    </header>
+    </div>
+</main>
 
-    <main class="group-main-board">
-        <div id="game-board"></div>
-        
-        <div id="question-overlay">
-            <div id="buzzer-status" style="font-family: var(--font-show); font-size: 2rem; color: var(--text-gold);"></div>
-            <div id="question-content" style="font-size: 3rem; padding: 20px; max-width: 90% max-height:50%;"></div>
-            <div class="host-only">
-                <button onclick="handleAnswer(true)" style="background:green; padding:15px 30px;">RICHTIG</button>
-                <button onclick="handleAnswer(false)" style="background:red; padding:15px 30px;">FALSCH</button>
-                <button onclick="closeQuestion()" style="background:#666; padding:15px 30px;">ZURÜCK</button>
-            </div>
-        </div>
-    </main>
-
-    <footer class="group-footer" id="player-area"></footer>
+<footer class="group-bottom" id="player-area"></footer>
 
 <script>
-    // Firebase Config (Deine Daten)
     const firebaseConfig = {
       apiKey: "AIzaSyBP2hzronbnt530dAEr906xMS8xzmg3bpo",
       authDomain: "quizshownaives.firebaseapp.com",
@@ -145,121 +145,131 @@
     const urlParams = new URLSearchParams(window.location.search);
     const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
     const isHost = (myPlayerIndex === null);
-
-    if(isHost) document.body.classList.add('is-host');
-
-    let audioEnabled = false;
-    function enableAudio() { audioEnabled = true; }
+    let audioUnlocked = false;
 
     if (!isHost) {
-        let n = prompt("Dein Name:");
-        if(n) db.child('players').child(myPlayerIndex).update({ name: n });
+        document.body.classList.add('is-player');
+        const name = prompt("Name:");
+        if(name) db.child('players').child(myPlayerIndex).update({ name: name });
+    }
+
+    // Audio-Engine freischalten (Browser-Schutz umgehen)
+    function unlockAudio() {
+        if(audioUnlocked) return;
+        ['correct', 'wrong', 'buzzer'].forEach(id => {
+            const a = document.getElementById('sound-' + id);
+            a.play().then(() => { a.pause(); a.currentTime = 0; });
+        });
+        audioUnlocked = true;
     }
 
     const boards = {
         1: { 
-            "KAT 1": [{pts:100,q:"Q",a:"A"},{pts:200,q:"Q",a:"A"},{pts:300,q:"Q",a:"A"},{pts:500,q:"Q",a:"A"}],
-            "KAT 2": [{pts:100,q:"Q",a:"A"},{pts:200,q:"Q",a:"A"},{pts:300,q:"Q",a:"A"},{pts:500,q:"Q",a:"A"}],
-            "KAT 3": [{pts:100,q:"Q",a:"A"},{pts:200,q:"Q",a:"A"},{pts:300,q:"Q",a:"A"},{pts:500,q:"Q",a:"A"}],
-            "KAT 4": [{pts:100,q:"Q",a:"A"},{pts:200,q:"Q",a:"A"},{pts:300,q:"Q",a:"A"},{pts:500,q:"Q",a:"A"}],
-            "KAT 5": [{pts:100,q:"Q",a:"A"},{pts:200,q:"Q",a:"A"},{pts:300,q:"Q",a:"A"},{pts:500,q:"Q",a:"A"}],
-            "KAT 6": [{pts:100,q:"Q",a:"A"},{pts:200,q:"Q",a:"A"},{pts:300,q:"Q",a:"A"},{pts:500,q:"Q",a:"A"}]
+            "KATEGORIE 1": [{pts:100,q:"Frage 1",a:"A1"},{pts:200,q:"Frage 2",a:"A2"},{pts:300,q:"Frage 3",a:"A3"},{pts:500,q:"Frage 4",a:"A4"}],
+            "KATEGORIE 2": [{pts:100,q:"?",a:"?"},{pts:200,q:"?",a:"?"},{pts:300,q:"?",a:"?"},{pts:500,q:"?",a:"?"}],
+            "KATEGORIE 3": [{pts:100,q:"?",a:"?"},{pts:200,q:"?",a:"?"},{pts:300,q:"?",a:"?"},{pts:500,q:"?",a:"?"}],
+            "KATEGORIE 4": [{pts:100,q:"?",a:"?"},{pts:200,q:"?",a:"?"},{pts:300,q:"?",a:"?"},{pts:500,q:"?",a:"?"}],
+            "KATEGORIE 5": [{pts:100,q:"?",a:"?"},{pts:200,q:"?",a:"?"},{pts:300,q:"?",a:"?"},{pts:500,q:"?",a:"?"}],
+            "KATEGORIE 6": [{pts:100,q:"?",a:"?"},{pts:200,q:"?",a:"?"},{pts:300,q:"?",a:"?"},{pts:500,q:"?",a:"?"}]
         },
-        2: { 
-            "FIN 1": [{pts:200,q:"F",a:"A"},{pts:400,q:"F",a:"A"},{pts:600,q:"F",a:"A"},{pts:1000,q:"F",a:"A"}],
-            "FIN 2": [{pts:200,q:"F",a:"A"},{pts:400,q:"F",a:"A"},{pts:600,q:"F",a:"A"},{pts:1000,q:"F",a:"A"}],
-            "FIN 3": [{pts:200,q:"F",a:"A"},{pts:400,q:"F",a:"A"},{pts:600,q:"F",a:"A"},{pts:1000,q:"F",a:"A"}],
-            "FIN 4": [{pts:200,q:"F",a:"A"},{pts:400,q:"F",a:"A"},{pts:600,q:"F",a:"A"},{pts:1000,q:"F",a:"A"}],
-            "FIN 5": [{pts:200,q:"F",a:"A"},{pts:400,q:"F",a:"A"},{pts:600,q:"F",a:"A"},{pts:1000,q:"F",a:"A"}],
-            "FIN 6": [{pts:200,q:"F",a:"A"},{pts:400,q:"F",a:"A"},{pts:600,q:"F",a:"A"},{pts:1000,q:"F",a:"A"}]
-        }
+        2: { "EXTRA": [{pts:200,q:"F",a:"A"}] }
     };
 
     let localState = {};
     db.on('value', snap => {
-        const data = snap.val();
-        if(!data) return;
-        if(audioEnabled && data.lastSound && data.lastSound !== localState.lastSound) {
-            const s = document.getElementById('snd-' + data.lastSound);
-            if(s) s.play().catch(()=>{});
+        const newState = snap.val();
+        if(!newState) return;
+        
+        // Sounds abspielen bei Effekt-Wechsel
+        if(newState.lastEffect && newState.lastEffect !== localState.lastEffect) {
+            if(newState.lastEffect === 'correct') triggerFlash('green');
+            if(newState.lastEffect === 'wrong') triggerFlash('red');
+            const s = document.getElementById('sound-' + newState.lastEffect);
+            if(s) { s.currentTime = 0; s.play().catch(e => console.log("Audio blockiert - Klicke auf die Seite!")); }
         }
-        localState = data;
+
+        localState = newState;
         updateUI();
     });
 
     function updateUI() {
+        if(!localState.players) return;
         const board = document.getElementById('game-board');
         board.innerHTML = '';
-        const bNum = localState.currentBoard || 1;
-        const cats = Object.keys(boards[bNum]);
-
-        cats.forEach(c => {
+        const data = boards[localState.currentBoard || 1];
+        
+        Object.keys(data).forEach(c => {
             const h = document.createElement('div'); h.className = 'category-header'; h.innerText = c; board.appendChild(h);
         });
 
         for(let i=0; i<4; i++) {
-            cats.forEach(c => {
-                const q = boards[bNum][c][i];
-                const id = `${bNum}-${c}-${i}`;
+            Object.keys(data).forEach(c => {
+                const q = data[c][i];
+                const id = `${localState.currentBoard || 1}-${c}-${i}`;
                 const card = document.createElement('div'); card.className = 'quiz-card';
-                if(localState.usedCards?.[bNum]?.includes(id)) card.classList.add('used');
-                card.innerText = q.pts;
-                card.onclick = () => { if(isHost && !card.classList.contains('used')) openQuestion(q, id); };
+                if(localState.usedCards?.[localState.currentBoard || 1]?.includes(id)) card.classList.add('used');
+                card.innerText = q ? q.pts : "";
+                card.onclick = () => { if(isHost && q && !card.classList.contains('used')) openQuestion(q, id); };
                 board.appendChild(card);
             });
         }
 
-        const area = document.getElementById('player-area');
-        area.innerHTML = '';
+        const area = document.getElementById('player-area'); area.innerHTML = '';
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
-            s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i ? 'selecting' : ''}`;
+            s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''}`;
+            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
-            s.onclick = () => { if(isHost) db.update({ selectingPlayerIndex: i }); };
             area.appendChild(s);
         });
 
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
+        // SPIELER SEHEN JETZT DIE FRAGE (oder die Antwort im ShowMode)
         if(localState.overlayOpen) {
-            document.getElementById('question-content').innerText = (isHost || localState.showAll) ? localState.currentQuestion : "BEREIT?";
-            if(isHost) document.getElementById('question-content').innerText += "\n\n(Lösung: " + localState.currentAnswer + ")";
+            document.getElementById('question-content').innerText = localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion;
+            if(isHost && !localState.showAnswerMode) {
+                document.getElementById('question-content').innerText += "\n(Antwort: " + localState.currentAnswer + ")";
+            }
         }
 
-        if(!isHost && localState.players[myPlayerIndex]) {
-            document.getElementById('identity-display').innerText = "DU BIST: " + localState.players[myPlayerIndex].name;
-        }
-
-        let status = localState.activePlayerIndex !== null ? localState.players[localState.activePlayerIndex].name + " ANTWORTET!" : (localState.canBuzz ? "BUZZER FREI!" : "");
-        document.getElementById('buzzer-status').innerText = status;
-        document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.selectingPlayerIndex !== null ? localState.players[localState.selectingPlayerIndex].name : "-");
+        document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.activePlayerIndex !== null ? localState.players[localState.activePlayerIndex].name : "---");
     }
 
     function openQuestion(q, id) {
         let used = localState.usedCards || {1:[], 2:[]};
-        if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
-        used[localState.currentBoard].push(id);
-        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, canBuzz: true, activePlayerIndex: null, showAll: true, lastSound: 'buzzer' });
+        if(!used[localState.currentBoard || 1]) used[localState.currentBoard || 1] = [];
+        used[localState.currentBoard || 1].push(id);
+        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, canBuzz: true, activePlayerIndex: null, showAnswerMode: false, lastEffect: 'buzzer' });
     }
 
     function handleAnswer(correct) {
         if(localState.activePlayerIndex === null) return;
-        let p = [...localState.players];
-        let idx = localState.activePlayerIndex;
+        let players = [...localState.players];
         if(correct) {
-            p[idx].score += localState.currentPoints;
-            db.update({ players: p, overlayOpen: false, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: idx, lastSound: 'correct' });
+            players[localState.activePlayerIndex].score += localState.currentPoints;
+            db.update({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
         } else {
-            p[idx].score -= Math.floor(localState.currentPoints / 2);
-            db.update({ players: p, activePlayerIndex: null, canBuzz: true, lastSound: 'wrong' });
+            players[localState.activePlayerIndex].score -= (localState.currentPoints / 2);
+            db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
         }
     }
 
-    function closeQuestion() { db.update({ overlayOpen: false, activePlayerIndex: null, canBuzz: false }); }
-    function switchBoard(n) { db.update({ currentBoard: n }); }
-    function resetGame() { if(confirm("Reset?")) db.set({ currentBoard: 1, usedCards: {1:[], 2:[]}, overlayOpen: false, activePlayerIndex: null, selectingPlayerIndex: 0, canBuzz: false, showAll: false, players: [{name:"S1",score:0},{name:"S2",score:0},{name:"S3",score:0},{name:"S4",score:0},{name:"S5",score:0}] }); }
+    function triggerFlash(color) {
+        const f = document.getElementById('flash-overlay');
+        f.style.backgroundColor = color === 'green' ? 'rgba(34,197,94,0.5)' : 'rgba(225,29,72,0.5)';
+        f.style.opacity = '1'; setTimeout(() => f.style.opacity = '0', 400);
+    }
 
-    window.onkeydown = (e) => { if(!isHost && localState.canBuzz && e.code === "Space") db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastSound: 'buzzer' }); };
+    function closeQuestion() { db.update({ overlayOpen: false, activePlayerIndex: null, canBuzz: false, lastEffect: '' }); }
+    function switchBoard(n) { db.update({ currentBoard: n }); }
+    function resetGame() { if(confirm("Reset?")) db.set({ players: [{name:"S1",score:0},{name:"S2",score:0},{name:"S3",score:0},{name:"S4",score:0},{name:"S5",score:0}], currentBoard: 1, usedCards: {1:[], 2:[]}, overlayOpen: false, activePlayerIndex: null, canBuzz: false, lastEffect: "" }); }
+
+    window.onkeydown = (e) => {
+        if(!isHost && localState.canBuzz && e.code === "Space") {
+            db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
+        }
+    };
 </script>
 </body>
 </html>
