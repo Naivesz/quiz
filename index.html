@@ -32,6 +32,15 @@
             display: flex; flex-direction: column;
         }
 
+        /* Versteckt Steuerungselemente für Spieler */
+        body.is-player .host-only {
+            display: none !important;
+        }
+        
+        body.is-player .quiz-card {
+            cursor: default !important;
+        }
+
         #flash-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 2000;
@@ -162,11 +171,13 @@
     <div class="gm-cam-slot"><div class="gm-label">NAIVES</div></div>
     <div class="nav-controls">
         <h1 class="logo-text">QUIZ DUELL</h1>
-        <button id="btn-b1" class="btn-nav active" onclick="switchBoard(1)">BOARD 1</button>
-        <button id="btn-b2" class="btn-nav" onclick="switchBoard(2)">BOARD 2</button>
+        <div class="host-only">
+            <button id="btn-b1" class="btn-nav active" onclick="switchBoard(1)">BOARD 1</button>
+            <button id="btn-b2" class="btn-nav" onclick="switchBoard(2)">BOARD 2</button>
+        </div>
     </div>
     <div class="turn-container">
-        <button class="btn-reset" onclick="resetGame()">RESET</button>
+        <button class="btn-reset host-only" onclick="resetGame()">RESET</button>
         <div id="current-turn-display">AM ZUG: -</div>
     </div>
 </div>
@@ -176,12 +187,12 @@
     <div id="question-overlay">
         <div id="buzzer-status" style="font-family: var(--font-show); font-size: 2rem; color: var(--text-gold); margin-bottom: 10px;"></div>
         <div id="question-content"></div>
-        <div class="controls" id="action-controls">
+        <div class="controls host-only" id="action-controls">
             <button class="btn-correct" onclick="handleAnswer(true)">RICHTIG</button>
             <button class="btn-wrong" onclick="handleAnswer(false)">FALSCH</button>
             <button class="btn-close" onclick="closeQuestion()">ZURÜCK</button>
         </div>
-        <button id="btn-next-round" onclick="closeQuestion()">NÄCHSTE RUNDE</button>
+        <button id="btn-next-round" class="host-only" onclick="closeQuestion()">NÄCHSTE RUNDE</button>
     </div>
 </div>
 
@@ -202,9 +213,15 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('game_state');
 
-    // Spieler Identifizierung via URL (?p=1)
+    // Identifizierung
     const urlParams = new URLSearchParams(window.location.search);
     const myPlayerIndex = urlParams.has('p') ? parseInt(urlParams.get('p')) - 1 : null;
+    const isHost = (myPlayerIndex === null);
+
+    // Body-Klasse setzen, um UI Elemente via CSS zu steuern
+    if (!isHost) {
+        document.body.classList.add('is-player');
+    }
 
     const boards = {
         1: { 
@@ -239,9 +256,13 @@
         updateUI();
     });
 
-    function updateSync(changes) { db.update(changes); }
+    function updateSync(changes) { 
+        if(isHost) db.update(changes); 
+        else if (changes.lastEffect === 'buzzer') db.update(changes); // Spieler darf nur Buzzer senden
+    }
 
     function resetGame() {
+        if(!isHost) return;
         if(confirm("Reset?")) {
             db.set({
                 players: [{ name: "Spieler 1", score: 0, locked: false }, { name: "Spieler 2", score: 0, locked: false }, { name: "Spieler 3", score: 0, locked: false }, { name: "Spieler 4", score: 0, locked: false }, { name: "Spieler 5", score: 0, locked: false }],
@@ -253,20 +274,9 @@
     function updateUI() {
         if (!localState.players) return;
 
-        // Zeige Spieler-Rolle im Logo an
-        if (myPlayerIndex !== null && localState.players[myPlayerIndex]) {
+        if (!isHost && localState.players[myPlayerIndex]) {
             document.querySelector('.logo-text').innerText = "DU BIST: " + localState.players[myPlayerIndex].name;
             document.querySelector('.logo-text').style.fontSize = "1.5rem";
-        }
-
-        document.getElementById('btn-b1').className = localState.currentBoard == 1 ? 'btn-nav active' : 'btn-nav';
-        document.getElementById('btn-b2').className = localState.currentBoard == 2 ? 'btn-nav active' : 'btn-nav';
-
-        const turnDisplay = document.getElementById('current-turn-display');
-        if (localState.activePlayerIndex !== null && localState.players[localState.activePlayerIndex]) {
-            turnDisplay.innerText = "AM ZUG: " + localState.players[localState.activePlayerIndex].name;
-        } else if (localState.players[localState.selectingPlayerIndex]) {
-            turnDisplay.innerText = "AM ZUG: " + localState.players[localState.selectingPlayerIndex].name;
         }
 
         const board = document.getElementById('game-board');
@@ -284,7 +294,7 @@
                     const card = document.createElement('div'); card.className = 'quiz-card';
                     if(localState.usedCards?.[localState.currentBoard]?.includes(cardId)) card.classList.add('used');
                     card.innerText = q ? q.pts : "";
-                    card.onclick = () => { if(q && !card.classList.contains('used')) openQuestion(q, cardId); };
+                    card.onclick = () => { if(isHost && q && !card.classList.contains('used')) openQuestion(q, cardId); };
                     board.appendChild(card);
                 });
             }
@@ -294,41 +304,42 @@
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
             s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i && localState.activePlayerIndex === null ? 'selecting' : ''}`;
-            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)"; // Markierung für mich selbst
+            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
-            s.onclick = () => { if(!localState.overlayOpen) updateSync({selectingPlayerIndex: i}); };
+            s.onclick = () => { if(isHost && !localState.overlayOpen) updateSync({selectingPlayerIndex: i}); };
             area.appendChild(s);
         });
 
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
-        document.getElementById('question-content').innerText = localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion;
-        document.getElementById('question-content').style.color = localState.showAnswerMode ? "var(--green-success)" : "white";
-        document.getElementById('action-controls').style.display = localState.showAnswerMode ? "none" : "flex";
-        document.getElementById('btn-next-round').style.display = localState.showAnswerMode ? "block" : "none";
+        document.getElementById('question-content').innerText = (localState.showAnswerMode || isHost) ? (localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion) : "???";
         
         let statusText = "";
         if(localState.activePlayerIndex !== null) {
             statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
         } else if(localState.canBuzz) {
-            statusText = "FALSCH! BUZZER FREI...";
+            statusText = "BUZZER FREI!";
         }
         document.getElementById('buzzer-status').innerText = statusText;
     }
 
     function openQuestion(q, id) {
+        if(!isHost) return;
         let used = localState.usedCards || {1:[], 2:[]};
         if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
         used[localState.currentBoard].push(id);
         updateSync({ 
             overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, 
-            activePlayerIndex: localState.selectingPlayerIndex, canBuzz: false, showAnswerMode: false,
+            activePlayerIndex: null, canBuzz: true, showAnswerMode: false,
             players: localState.players.map(p => ({...p, locked: false})) 
         });
     }
 
     function handleAnswer(correct) {
+        if(!isHost) return;
         let players = [...localState.players];
+        if(localState.activePlayerIndex === null) return;
+
         if(correct) {
             players[localState.activePlayerIndex].score += localState.currentPoints;
             updateSync({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
@@ -348,32 +359,17 @@
     }
 
     function playSound(id) { const s = document.getElementById('sound-' + id); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
-    function closeQuestion() { updateSync({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
-    function switchBoard(n) { updateSync({currentBoard: n}); }
+    function closeQuestion() { if(isHost) updateSync({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
+    function switchBoard(n) { if(isHost) updateSync({currentBoard: n}); }
 
-    // Angepasste Buzzer-Logik
     window.addEventListener('keydown', (e) => {
-        // Falls ein fester Spieler-Index zugewiesen wurde (?p=1 etc.)
-        if (myPlayerIndex !== null) {
-            // Reagiert auf Leertaste ODER die eigene Nummerntaste
-            const isMyKey = (e.code === "Space" || e.code === "Digit" + (myPlayerIndex + 1));
-            
-            if(localState.canBuzz && isMyKey) {
+        if (!isHost && myPlayerIndex !== null) {
+            // NUR Spieler darf mit Leertaste buzzern
+            if(localState.canBuzz && e.code === "Space") {
                 if(!localState.players[myPlayerIndex].locked) {
                     playSound('buzzer');
-                    updateSync({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
-                    setTimeout(() => updateSync({lastEffect: ''}), 500);
-                }
-            }
-        } else {
-            // Host/Admin Modus (Zahlen 1-5 wie vorher)
-            const keyMap = { "Digit1": 0, "Digit2": 1, "Digit3": 2, "Digit4": 3, "Digit5": 4 };
-            if(localState.canBuzz && keyMap.hasOwnProperty(e.code)) {
-                const pIdx = keyMap[e.code];
-                if(!localState.players[pIdx].locked) {
-                    playSound('buzzer');
-                    updateSync({ activePlayerIndex: pIdx, canBuzz: false, lastEffect: 'buzzer' });
-                    setTimeout(() => updateSync({lastEffect: ''}), 500);
+                    db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
+                    setTimeout(() => db.update({lastEffect: ''}), 500);
                 }
             }
         }
