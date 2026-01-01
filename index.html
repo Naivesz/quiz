@@ -2,181 +2,59 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jeopardy Quiz Show Deluxe - OBS Overlay</title>
+    <title>Jeopardy Quiz Show - Fix Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Kanit:wght@600;800;900&display=swap" rel="stylesheet">
-    
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
     <style>
         :root {
-            --blue-dark: #020617;
-            --blue-main: #0a192f;
-            --blue-card: #1e3a8a;
-            --blue-highlight: #3b82f6;
-            --red-accent: #e11d48;
-            --green-success: #22c55e;
-            --text-gold: #fde047;
-            --font-show: 'Anton', sans-serif;
-            --font-text: 'Kanit', sans-serif;
+            --blue-dark: #020617; --blue-main: #0a192f; --blue-card: #1e3a8a;
+            --blue-highlight: #3b82f6; --red-accent: #e11d48; --green-success: #22c55e;
+            --text-gold: #fde047; --font-show: 'Anton', sans-serif; --font-text: 'Kanit', sans-serif;
         }
-
-        html, body {
-            background-color: transparent !important;
-            margin: 0; padding: 0;
-            height: 100vh; width: 100vw;
-            overflow: hidden;
-            color: white;
-            font-family: var(--font-text);
-            display: flex; flex-direction: column;
-        }
-
+        html, body { background-color: transparent !important; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; color: white; font-family: var(--font-text); display: flex; flex-direction: column; }
         body.is-player .host-only { display: none !important; }
-        body.is-player .quiz-card { cursor: default !important; }
-
-        #flash-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 2000;
-            opacity: 0; transition: opacity 0.1s ease-out;
-        }
-
-        .top-bar {
-            display: grid; grid-template-columns: 20% 1fr 20%; 
-            align-items: center; padding: 10px 30px;
-            background: var(--blue-dark); border-bottom: 3px solid var(--blue-highlight);
-            flex-shrink: 0; z-index: 1100;
-        }
-
-        .gm-cam-slot {
-            width: 100%; aspect-ratio: 16/9;
-            background: transparent !important;
-            border: 3px solid var(--red-accent); border-radius: 10px; position: relative;
-        }
-
-        .gm-label {
-            position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
-            background: var(--red-accent); padding: 2px 15px; font-size: 0.8rem;
-            font-family: var(--font-show); border-radius: 4px;
-        }
-
-        .nav-controls { text-align: center; }
-        .logo-text { font-family: var(--font-show); font-size: 2.2rem; color: var(--text-gold); margin: 0; }
-
-        .btn-nav {
-            background: var(--blue-card); border: 1px solid var(--blue-highlight);
-            color: white; padding: 5px 15px; font-family: var(--font-show);
-            cursor: pointer; margin: 5px 2px; border-radius: 4px;
-        }
-
-        .btn-nav.active { background: var(--blue-highlight); box-shadow: 0 0 10px var(--blue-highlight); }
-        .btn-reset { background: var(--red-accent); border: none; color: white; padding: 8px 15px; font-family: var(--font-show); cursor: pointer; border-radius: 4px; }
-
-        .turn-container {
-            text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
-        }
-
-        #current-turn-display {
-            font-family: var(--font-show); color: var(--text-gold); font-size: 1.6rem;
-            text-transform: uppercase; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-
-        #board-container { position: relative; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-        #game-board {
-            display: grid; grid-template-columns: repeat(6, 1fr);
-            gap: 10px; padding: 15px 30px; background: var(--blue-dark); height: 100%;
-        }
-
-        .category-header {
-            background: linear-gradient(to bottom, var(--red-accent), #991b1b);
-            padding: 10px 5px; text-align: center; font-family: var(--font-show);
-            font-size: 1.1rem; text-transform: uppercase; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .quiz-card {
-            background: linear-gradient(145deg, var(--blue-card), var(--blue-main));
-            border: 2px solid var(--blue-highlight); border-radius: 6px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 2rem; font-family: var(--font-show); color: var(--text-gold); cursor: pointer;
-        }
-
+        .top-bar { display: grid; grid-template-columns: 20% 1fr 20%; align-items: center; padding: 10px 30px; background: var(--blue-dark); border-bottom: 3px solid var(--blue-highlight); }
+        .gm-cam-slot { width: 100%; aspect-ratio: 16/9; border: 3px solid var(--red-accent); border-radius: 10px; position: relative; }
+        .logo-text { font-family: var(--font-show); font-size: 2.2rem; color: var(--text-gold); text-align: center; }
+        #game-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 15px 30px; background: var(--blue-dark); flex-grow: 1; }
+        .category-header { background: linear-gradient(to bottom, var(--red-accent), #991b1b); text-align: center; font-family: var(--font-show); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+        .quiz-card { background: linear-gradient(145deg, var(--blue-card), var(--blue-main)); border: 2px solid var(--blue-highlight); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-family: var(--font-show); color: var(--text-gold); cursor: pointer; }
         .quiz-card.used { opacity: 0.05; cursor: default; }
-
-        .player-area {
-            display: grid; grid-template-columns: repeat(5, 1fr);
-            gap: 15px; padding: 15px 30px;
-            background: var(--blue-dark); border-top: 5px solid var(--blue-highlight);
-            flex-shrink: 0; z-index: 1100;
-        }
-
-        .player-slot {
-            aspect-ratio: 16/9; background: transparent !important;
-            border: 2px solid #333; position: relative; border-radius: 8px;
-        }
-
+        .player-area { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; padding: 15px 30px; background: var(--blue-dark); border-top: 5px solid var(--blue-highlight); }
+        .player-slot { aspect-ratio: 16/9; border: 2px solid #333; position: relative; border-radius: 8px; cursor: pointer; }
         .player-slot.active-buzzer { border-color: var(--red-accent); box-shadow: 0 0 20px var(--red-accent); }
         .player-slot.selecting { border-color: var(--text-gold); border-style: dashed; }
-
-        .player-info {
-            position: absolute; bottom: 0; width: 100%;
-            background: rgba(225, 29, 72, 0.95); text-align: center;
-            font-weight: 900; font-size: 1rem; padding: 5px 0; text-transform: uppercase;
-        }
-
-        #question-overlay {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(2, 6, 23, 0.95); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            z-index: 1050; flex-direction: column; align-items: center; justify-content: center;
-        }
-
-        #question-content {
-            font-size: 3.2rem; font-weight: 800; max-width: 85%; margin: 20px 0;
-            text-align: center; text-shadow: 2px 2px 15px rgba(0,0,0,0.9);
-        }
-
-        .controls { display: flex; gap: 15px; }
-        button { padding: 12px 25px; font-family: var(--font-show); cursor: pointer; border: none; border-radius: 6px; color: white; }
-        .btn-correct { background: var(--green-success); }
-        .btn-wrong { background: var(--red-accent); }
-        .btn-close { background: #475569; }
+        .player-info { position: absolute; bottom: 0; width: 100%; background: rgba(225, 29, 72, 0.95); text-align: center; font-weight: 900; padding: 5px 0; }
+        #question-overlay { display: none; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.98); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; }
+        #question-content { font-size: 3rem; text-align: center; padding: 40px; max-width: 80%; }
+        .host-only button { margin: 10px; padding: 15px 30px; font-family: var(--font-show); cursor: pointer; border-radius: 5px; border: none; color: white; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
-<audio id="sound-correct" src="correct.mp3"></audio>
-<audio id="sound-wrong" src="wrong.mp3"></audio>
-<audio id="sound-buzzer" src="buzzer.mp3"></audio>
-
-<div id="flash-overlay"></div>
-
 <div class="top-bar">
-    <div class="gm-cam-slot"><div class="gm-label">NAIVES</div></div>
+    <div class="gm-cam-slot"><div style="position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); background:var(--red-accent); padding:2px 10px; font-size:0.7rem;">NAIVES</div></div>
     <div class="nav-controls">
         <h1 class="logo-text">QUIZ DUELL</h1>
         <div class="host-only">
-            <button id="btn-b1" class="btn-nav active" onclick="switchBoard(1)">BOARD 1</button>
-            <button id="btn-b2" class="btn-nav" onclick="switchBoard(2)">BOARD 2</button>
+            <button onclick="switchBoard(1)">B1</button>
+            <button onclick="switchBoard(2)">B2</button>
+            <button onclick="resetGame()" style="background:red;">RESET ALL</button>
         </div>
     </div>
-    <div class="turn-container">
-        <button class="btn-reset host-only" onclick="resetGame()">RESET</button>
-        <div id="current-turn-display">AM ZUG: -</div>
-    </div>
+    <div id="current-turn-display" style="color:var(--text-gold); font-family:var(--font-show); text-align:right;">AM ZUG: -</div>
 </div>
 
-<div id="board-container">
-    <div id="game-board"></div>
-    <div id="question-overlay">
-        <div id="buzzer-status" style="font-family: var(--font-show); font-size: 2rem; color: var(--text-gold); margin-bottom: 10px;"></div>
-        <div id="question-content"></div>
-        <div class="controls host-only" id="action-controls">
-            <button class="btn-correct" onclick="handleAnswer(true)">RICHTIG</button>
-            <button class="btn-wrong" onclick="handleAnswer(false)">FALSCH</button>
-            <button class="btn-close" onclick="closeQuestion()">ZURÜCK</button>
-        </div>
+<div id="game-board"></div>
+
+<div id="question-overlay">
+    <div id="buzzer-status" style="font-family:var(--font-show); font-size:2rem; color:var(--text-gold);"></div>
+    <div id="question-content"></div>
+    <div class="host-only">
+        <button onclick="handleAnswer(true)" style="background:green;">RICHTIG (+)</button>
+        <button onclick="handleAnswer(false)" style="background:red;">FALSCH (-)</button>
+        <button onclick="closeQuestion()" style="background:#444;">SCHLIESSEN</button>
     </div>
 </div>
 
@@ -190,8 +68,7 @@
       projectId: "quizshownaives",
       storageBucket: "quizshownaives.firebasestorage.app",
       messagingSenderId: "569001129434",
-      appId: "1:569001129434:web:87f6e6af8ac09296163ce3",
-      measurementId: "G-68DJKPLJPE"
+      appId: "1:569001129434:web:87f6e6af8ac09296163ce3"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -203,136 +80,96 @@
 
     if (!isHost) {
         document.body.classList.add('is-player');
-        // NAME ABFRAGEN
-        const userName = prompt("Bitte gib deinen Namen ein:");
-        if (userName) {
-            db.child('players').child(myPlayerIndex).update({ name: userName });
-        }
+        let n = prompt("Dein Name:");
+        if(n) db.child('players').child(myPlayerIndex).update({ name: n });
     }
 
     const boards = {
-        1: { 
-            "KATEGORIE 1": [{pts:100,q:"Was ist die Hauptstadt von Frankreich?",a:"Paris"},{pts:200,q:"Wie viele Kontinente gibt es?",a:"7"},{pts:300,q:"Wer malte die Mona Lisa?",a:"Leonardo da Vinci"},{pts:500,q:"Was ist das chemische Symbol für Gold?",a:"Au"}],
-            "KATEGORIE 2": [{pts:100,q:"Frage?",a:"Antwort"},{pts:200,q:"Frage?",a:"Antwort"},{pts:300,q:"Frage?",a:"Antwort"},{pts:500,q:"Frage?",a:"Antwort"}],
-            "KATEGORIE 3": [{pts:100,q:"Frage?",a:"Antwort"},{pts:200,q:"Frage?",a:"Antwort"},{pts:300,q:"Frage?",a:"Antwort"},{pts:500,q:"Frage?",a:"Antwort"}],
-            "KATEGORIE 4": [{pts:100,q:"Frage?",a:"Antwort"},{pts:200,q:"Frage?",a:"Antwort"},{pts:300,q:"Frage?",a:"Antwort"},{pts:500,q:"Frage?",a:"Antwort"}],
-            "KATEGORIE 5": [{pts:100,q:"Frage?",a:"Antwort"},{pts:200,q:"Frage?",a:"Antwort"},{pts:300,q:"Frage?",a:"Antwort"},{pts:500,q:"Frage?",a:"Antwort"}],
-            "KATEGORIE 6": [{pts:100,q:"Frage?",a:"Antwort"},{pts:200,q:"Frage?",a:"Antwort"},{pts:300,q:"Frage?",a:"Antwort"},{pts:500,q:"Frage?",a:"Antwort"}] 
-        },
-        2: { 
-            "EXTRA 1": [{pts:200,q:"Frage?",a:"Antwort"},{pts:400,q:"Frage?",a:"Antwort"},{pts:600,q:"Frage?",a:"Antwort"},{pts:1000,q:"Frage?",a:"Antwort"}]
-        }
+        1: { "WISSEN": [{pts:100,q:"Hauptstadt von DE?",a:"Berlin"},{pts:200,q:"2+2?",a:"4"},{pts:300,q:"Größter Ozean?",a:"Pazifik"},{pts:500,q:"Wer schrieb Faust?",a:"Goethe"}] },
+        2: { "PROFI": [{pts:200,q:"Frage 1?",a:"A1"},{pts:400,q:"Frage 2?",a:"A2"}] }
     };
 
     let localState = {};
-
-    db.on('value', (snapshot) => {
-        const newState = snapshot.val();
-        if(!newState || !newState.players) return;
-        
-        if(newState.lastEffect === 'correct' && localState.lastEffect !== 'correct') { triggerFlash('green'); playSound('correct'); }
-        if(newState.lastEffect === 'wrong' && localState.lastEffect !== 'wrong') { triggerFlash('red'); playSound('wrong'); }
-        if(newState.lastEffect === 'buzzer' && localState.lastEffect !== 'buzzer') { playSound('buzzer'); }
-
-        localState = newState;
-        updateUI();
+    db.on('value', (snap) => {
+        localState = snap.val();
+        if(localState) updateUI();
     });
 
     function updateUI() {
-        if (!localState.players) return;
+        if(!localState.players) return;
 
-        // Eigener Name im Logo (nur für Spieler)
-        if (!isHost && localState.players[myPlayerIndex]) {
-            const nameLabel = localState.players[myPlayerIndex].name || "Spieler";
-            document.querySelector('.logo-text').innerText = "DU BIST: " + nameLabel;
-        }
-
-        const board = document.getElementById('game-board');
-        board.innerHTML = '';
+        // Board
+        const boardDiv = document.getElementById('game-board');
+        boardDiv.innerHTML = '';
         const data = boards[localState.currentBoard || 1];
-        if (data) {
-            Object.keys(data).forEach(c => {
-                const h = document.createElement('div'); h.className = 'category-header'; h.innerText = c; board.appendChild(h);
+        Object.keys(data).forEach(cat => {
+            const h = document.createElement('div'); h.className = 'category-header'; h.innerText = cat;
+            boardDiv.appendChild(h);
+        });
+        for(let i=0; i<4; i++) {
+            Object.keys(data).forEach(cat => {
+                const q = data[cat][i];
+                const id = `${localState.currentBoard}-${cat}-${i}`;
+                const card = document.createElement('div'); card.className = 'quiz-card';
+                if(localState.usedCards?.[localState.currentBoard]?.includes(id)) card.classList.add('used');
+                card.innerText = q ? q.pts : "";
+                card.onclick = () => { if(isHost && q) openQuestion(q, id); };
+                boardDiv.appendChild(card);
             });
-            for(let i=0; i<4; i++) {
-                Object.keys(data).forEach(c => {
-                    const q = data[c][i];
-                    const cardId = `${localState.currentBoard}-${c}-${i}`;
-                    const card = document.createElement('div'); card.className = 'quiz-card';
-                    if(localState.usedCards?.[localState.currentBoard]?.includes(cardId)) card.classList.add('used');
-                    card.innerText = q ? q.pts : "";
-                    card.onclick = () => { if(isHost && q && !card.classList.contains('used')) openQuestion(q, cardId); };
-                    board.appendChild(card);
-                });
-            }
         }
 
-        const area = document.getElementById('player-area'); area.innerHTML = '';
+        // Spieler & Auswahl
+        const area = document.getElementById('player-area');
+        area.innerHTML = '';
         localState.players.forEach((p, i) => {
             const s = document.createElement('div');
-            s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i && localState.activePlayerIndex === null ? 'selecting' : ''}`;
-            if(i === myPlayerIndex) s.style.border = "4px solid var(--text-gold)";
+            s.className = `player-slot ${localState.activePlayerIndex === i ? 'active-buzzer' : ''} ${localState.selectingPlayerIndex === i ? 'selecting' : ''}`;
             s.innerHTML = `<div class="player-info">${p.name}: ${p.score}</div>`;
-            s.onclick = () => { if(isHost && !localState.overlayOpen) db.update({selectingPlayerIndex: i}); };
+            s.onclick = () => { if(isHost) db.update({ selectingPlayerIndex: i }); };
             area.appendChild(s);
         });
 
+        // Overlay & Frage sichtbar machen
         const overlay = document.getElementById('question-overlay');
         overlay.style.display = localState.overlayOpen ? 'flex' : 'none';
-        document.getElementById('question-content').innerText = (localState.showAnswerMode || isHost) ? (localState.showAnswerMode ? localState.currentAnswer : localState.currentQuestion) : "???";
         
-        let statusText = "";
-        if(localState.activePlayerIndex !== null) {
-            statusText = localState.showAnswerMode ? "RICHTIG!" : localState.players[localState.activePlayerIndex].name.toUpperCase() + " ANTWORTET...";
-        } else if(localState.canBuzz) {
-            statusText = "BUZZER FREI!";
+        // WICHTIG: Hier wird die Frage für alle gesetzt
+        if(localState.overlayOpen) {
+            document.getElementById('question-content').innerText = isHost ? `FRAGE: ${localState.currentQuestion}\n\nANTWORT: ${localState.currentAnswer}` : localState.currentQuestion;
         }
-        document.getElementById('buzzer-status').innerText = statusText;
-        document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.activePlayerIndex !== null ? localState.players[localState.activePlayerIndex].name : "---");
+
+        document.getElementById('current-turn-display').innerText = "AM ZUG: " + (localState.selectingPlayerIndex !== null ? localState.players[localState.selectingPlayerIndex].name : "-");
     }
 
     function openQuestion(q, id) {
-        if(!isHost) return;
-        let used = localState.usedCards || {1:[], 2:[]};
+        let used = localState.usedCards || {};
         if(!used[localState.currentBoard]) used[localState.currentBoard] = [];
         used[localState.currentBoard].push(id);
-        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, activePlayerIndex: null, canBuzz: true, showAnswerMode: false, players: localState.players.map(p => ({...p, locked: false})) });
+        db.update({ overlayOpen: true, currentQuestion: q.q, currentAnswer: q.a, currentPoints: q.pts, usedCards: used, canBuzz: true, activePlayerIndex: null });
     }
 
     function handleAnswer(correct) {
-        if(!isHost) return;
-        let players = [...localState.players];
-        if(localState.activePlayerIndex === null) return;
+        let idx = localState.activePlayerIndex;
+        if(idx === null) return;
+        let p = [...localState.players];
         if(correct) {
-            players[localState.activePlayerIndex].score += localState.currentPoints;
-            db.update({ players: players, showAnswerMode: true, canBuzz: false, lastEffect: 'correct' });
+            p[idx].score += localState.currentPoints;
+            db.update({ players: p, overlayOpen: false, activePlayerIndex: null, canBuzz: false });
         } else {
-            players[localState.activePlayerIndex].score -= (localState.currentPoints / 2);
-            players[localState.activePlayerIndex].locked = true;
-            db.update({ players: players, activePlayerIndex: null, canBuzz: true, lastEffect: 'wrong' });
+            p[idx].score -= (localState.currentPoints / 2);
+            db.update({ players: p, activePlayerIndex: null, canBuzz: true });
         }
-        setTimeout(() => db.update({lastEffect: ''}), 500);
     }
 
-    function triggerFlash(color) {
-        const flash = document.getElementById('flash-overlay');
-        flash.style.backgroundColor = color === 'green' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(225, 29, 72, 0.4)';
-        flash.style.opacity = '1'; setTimeout(() => flash.style.opacity = '0', 300);
-    }
+    function closeQuestion() { db.update({ overlayOpen: false, activePlayerIndex: null, canBuzz: false }); }
+    function switchBoard(n) { db.update({ currentBoard: n }); }
+    function resetGame() { if(confirm("Wirklich alles resetten?")) db.set({ currentBoard: 1, usedCards: {1:[], 2:[]}, overlayOpen: false, activePlayerIndex: null, selectingPlayerIndex: 0, canBuzz: false, players: [{name:"S1",score:0},{name:"S2",score:0},{name:"S3",score:0},{name:"S4",score:0},{name:"S5",score:0}] }); }
 
-    function playSound(id) { const s = document.getElementById('sound-' + id); if(s) { s.currentTime=0; s.play().catch(()=>{}); } }
-    function closeQuestion() { if(isHost) db.update({overlayOpen: false, activePlayerIndex: null, canBuzz: false}); }
-    function switchBoard(n) { if(isHost) db.update({currentBoard: n}); }
-    function resetGame() { if(isHost && confirm("Reset?")) db.set({ players: [{ name: "Spieler 1", score: 0, locked: false }, { name: "Spieler 2", score: 0, locked: false }, { name: "Spieler 3", score: 0, locked: false }, { name: "Spieler 4", score: 0, locked: false }, { name: "Spieler 5", score: 0, locked: false }], currentBoard: 1, usedCards: { 1: [], 2: [] }, overlayOpen: false, currentPoints: 0, activePlayerIndex: null, canBuzz: false, selectingPlayerIndex: 0, currentQuestion: "", currentAnswer: "", showAnswerMode: false, lastEffect: "" }); }
-
-    window.addEventListener('keydown', (e) => {
-        if (!isHost && myPlayerIndex !== null && localState.canBuzz && e.code === "Space") {
-            if(!localState.players[myPlayerIndex].locked) {
-                db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false, lastEffect: 'buzzer' });
-                setTimeout(() => db.update({lastEffect: ''}), 500);
-            }
+    window.onkeydown = (e) => {
+        if(!isHost && localState.canBuzz && e.code === "Space") {
+            db.update({ activePlayerIndex: myPlayerIndex, canBuzz: false });
         }
-    });
+    };
 </script>
 </body>
 </html>
